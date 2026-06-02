@@ -78,11 +78,10 @@ export {
 // Consumed only by the composition root (@prd-gen/mcp-server).
 export { BenchmarkConsensusReliabilityProvider } from "./consensus-reliability-adapter.js";
 
-// Phase 4.5 — calibration runner + outputs (Wave D / D3).
-export {
-  runCalibration,
-  type RunnerResult,
-} from "./calibrate-gates.js";
+// Phase 4.5 — calibration outputs + constants (Wave D / D3).
+// NOTE: the script-only runner `runCalibration` (and `selectModeFromArgv`) are
+// intentionally NOT re-exported from this barrel — see the §2.2 boundary note
+// at the foot of this file.
 export {
   PRE_REGISTERED_SEED_45,
   PRE_REGISTERED_SEED_42,
@@ -129,23 +128,25 @@ export {
 } from "./external-oracle.js";
 export { OracleUnavailableError } from "./oracle-errors.js";
 
-// Wave F2 — production-mode calibration runner.
-// Companion to runCalibration (canned-baseline). Output is written to a
-// parallel artefact (gate-calibration-K100-production.json).
-export {
-  runProductionCalibration,
-  PRE_REGISTERED_SEED_45_PRODUCTION,
-  DEFAULT_K_PRODUCTION,
-  PRODUCTION_OUTPUT_BASENAME,
-  type ProductionRunnerOptions,
-  type ProductionRunnerResult,
-  type ProductionGateCalibration,
-} from "./calibrate-gates-production.js";
-
-// Wave F final remediation — CLI entry extracted to its own module to keep
-// calibrate-gates-production.ts under the §4.1 500-LOC cap. The re-export
-// here preserves the public surface for any consumer that imports it from
-// the calibration barrel.
-export { runProductionFromCli } from "./calibrate-gates-production-cli.js";
-
-export { selectModeFromArgv } from "./calibrate-gates.js";
+// ─── §2.2 layer boundary: script-only runners are NOT re-exported here ───────
+//
+// `calibrate-gates.ts`, `calibrate-gates-production.ts`, and
+// `calibrate-gates-production-cli.ts` are *script-only* modules (top-level
+// await, FS writes, deterministic CLI side effects — see the layer-contract
+// banner in calibrate-gates-production.ts §2.2). Re-exporting their runners
+// (`runCalibration`, `selectModeFromArgv`, `runProductionCalibration`,
+// `runProductionFromCli`) from this *library* barrel pulled the whole
+// top-level-await script island into every static consumer of
+// `@prd-gen/benchmark/calibration`.
+//
+// The composition root (@prd-gen/mcp-server) imports this barrel only for the
+// library-safe oracle + stats seams above. esbuild, bundling the MCP server,
+// must initialise every statically-reachable module — so the script island's
+// top-level await was awaited at server startup and never settled, deadlocking
+// `server.connect()` (the MCP `initialize` handshake never completed).
+//
+// The runners have no barrel consumers; the CLIs and their tests import them
+// directly from their own modules (e.g. `./calibrate-gates.js`). Keeping them
+// out of the library barrel is the fix.
+//
+// source: this PR — MCP startup deadlock root-cause; coding-standards.md §2.2.
