@@ -100,6 +100,68 @@ export const SectionStatusSchema = z.object({
 });
 export type SectionStatus = z.infer<typeof SectionStatusSchema>;
 
+/**
+ * Bounded-I/O caps for in-memory pipeline arrays (Phase 1c).
+ *
+ * PipelineState lives in the runStore and is serialized into MCP responses
+ * (get_pipeline_state format:"full" returns the whole state; section prompts
+ * embed clarification_qa). Two append-only arrays can grow without bound:
+ * `clarifications` (one turn per Q&A round) and `errors` (one per failure).
+ * Neither had a contract cap before Phase 1c — the per-context clarification
+ * range bounds rounds in the handler, but for the default tier
+ * CAPABILITIES.maxClarificationRounds is Infinity, so the schema is the only
+ * guaranteed bound.
+ *
+ * Budget derivation (measured, not invented):
+ *   Claude Code rejects MCP tool results over 25,000 tokens = 100,000 chars
+ *   of compact JSON.
+ *   source: Claude Code 2.1.170 binary, extracted 2026-06-10 — default
+ *   MAX_MCP_OUTPUT_TOKENS d4O=25000, estimator chars/4 → 100,000 char cap.
+ *   Verified char-exact against a rejected 324,429-char response. Mirrors the
+ *   Cortex sibling repo's MAX_RESPONSE_CHARS = 100_000.
+ */
+// source: Claude Code 2.1.170 binary cap (see block comment above).
+const MAX_RESPONSE_CHARS = 100_000;
+
+/**
+ * Max clarification turns retained. A turn serializes to ~1,000 chars
+ * (round + question + answer + two ISO timestamps; question/answer are short
+ * sentences). get_pipeline_state format:"full" ships the whole array over MCP,
+ * and section prompts embed clarification_qa, so the turns must fit the
+ * 100,000-char response budget alongside the rest of the state.
+ *   source: measured 2026-06-10 — a representative clarification turn from a
+ *   production run serialized to 740 chars compact-JSON; rounded up to 1,000
+ *   to leave headroom for long freeform answers.
+ * Cap = floor((MAX_RESPONSE_CHARS / 2) / 1000) = 50. Half the budget is
+ * reserved for clarifications so the other half covers the rest of the state
+ * (sections, errors, grounding) when format:"full" is requested.
+ */
+const CLARIFICATION_TURN_CHARS = 1_000; // measured 740, rounded up (see above)
+export const MAX_CLARIFICATION_TURNS = Math.floor(
+  MAX_RESPONSE_CHARS / 2 / CLARIFICATION_TURN_CHARS,
+); // 50
+
+/**
+ * Max error messages retained (FIFO). Genuine error messages only — not a
+ * progress log. An error string is short (≤500 chars by convention), and the
+ * parallel error_kinds entry is a single enum token. The errors array ships
+ * its length over MCP (envelope.state_summary.errors) but its contents ship in
+ * format:"full". Cap so the array cannot dominate the 100,000-char response
+ * budget: floor((MAX_RESPONSE_CHARS / 4) / 500) = 50. A quarter of the budget
+ * is allotted to errors+kinds; the rest covers sections, clarifications, and
+ * grounding.
+ *   source: 500-char error floor is the project convention (errors are
+ *   single-sentence failure messages, not stack dumps); measured 2026-06-10,
+ *   longest observed pipeline error was 312 chars.
+ * Eviction is FIFO with a dropped count surfaced via appendError's return —
+ * never silent loss (Phase 1c rule). The oldest errors are dropped because the
+ * most recent failures are the ones a caller acts on.
+ */
+const ERROR_MESSAGE_CHARS = 500; // project convention, measured max 312
+export const MAX_PIPELINE_ERRORS = Math.floor(
+  MAX_RESPONSE_CHARS / 4 / ERROR_MESSAGE_CHARS,
+); // 50
+
 export const ClarificationTurnSchema = z.object({
   round: z.number().int().min(1),
   question: z.string(),
@@ -198,7 +260,19 @@ export const PipelineStateSchema = z.object({
    */
   preflight_status: z.enum(["ok", "skipped"]).nullable().default(null),
   sections: z.array(SectionStatusSchema).default([]),
-  clarifications: z.array(ClarificationTurnSchema).default([]),
+  /**
+   * Bounded-I/O cap (Phase 1c): at most MAX_CLARIFICATION_TURNS turns. The
+   * handler bounds rounds per-context, but the default tier's
+   * CAPABILITIES.maxClarificationRounds is Infinity, so this schema cap is the
+   * guaranteed bound. Over-cap state parses to a ZodError (observable) rather
+   * than silently growing the MCP response. source: see MAX_CLARIFICATION_TURNS.
+   */
+  clarifications: z
+    .array(ClarificationTurnSchema)
+    .max(MAX_CLARIFICATION_TURNS, {
+      message: `clarifications exceeds ${MAX_CLARIFICATION_TURNS}-turn bounded-I/O cap (Claude Code 100,000-char MCP response budget). source: see MAX_CLARIFICATION_TURNS in state.ts.`,
+    })
+    .default([]),
   /**
    * Set when the user types "proceed" or clarification reaches max rounds.
    * Read by handleBudget to sanity-check that clarification finished cleanly
@@ -207,8 +281,21 @@ export const PipelineStateSchema = z.object({
   proceed_signal: z.boolean().default(false),
   started_at: z.string(),
   updated_at: z.string(),
-  /** Genuine error messages only. NOT a progress log. */
-  errors: z.array(z.string()).default([]),
+  /**
+   * Genuine error messages only. NOT a progress log.
+   *
+   * Bounded-I/O cap (Phase 1c): at most MAX_PIPELINE_ERRORS entries, kept in
+   * lockstep with error_kinds. Appended ONLY via appendError(), which performs
+   * FIFO eviction (drops oldest) once the cap is reached and reports the
+   * dropped count — never silent loss. The schema .max() is the backstop that
+   * makes a direct over-cap spread fail to parse. source: see MAX_PIPELINE_ERRORS.
+   */
+  errors: z
+    .array(z.string())
+    .max(MAX_PIPELINE_ERRORS, {
+      message: `errors exceeds ${MAX_PIPELINE_ERRORS}-entry bounded-I/O cap — append via appendError() (FIFO eviction). source: see MAX_PIPELINE_ERRORS in state.ts.`,
+    })
+    .default([]),
   /**
    * Parallel to `errors[]` (same length, same order). Tags each error as
    * one of three kinds. pipeline-kpis.ts:structural_error_count reads
@@ -241,7 +328,19 @@ export const PipelineStateSchema = z.object({
    */
   error_kinds: z
     .array(z.enum(["section_failure", "structural", "upstream_failure"]))
+    // Bounded-I/O cap (Phase 1c): lockstep with errors[], same cap. source: MAX_PIPELINE_ERRORS.
+    .max(MAX_PIPELINE_ERRORS, {
+      message: `error_kinds exceeds ${MAX_PIPELINE_ERRORS}-entry bounded-I/O cap (must stay lockstep with errors[]). source: see MAX_PIPELINE_ERRORS in state.ts.`,
+    })
     .default([]),
+  /**
+   * Count of error entries evicted from `errors`/`error_kinds` by appendError's
+   * FIFO cap (bounded-I/O, Phase 1c). Non-zero means the run produced more than
+   * MAX_PIPELINE_ERRORS errors and the oldest were dropped to stay within the
+   * MCP response budget — the drop is observable here, never silent.
+   * source: see MAX_PIPELINE_ERRORS / appendError in this file.
+   */
+  errors_dropped: z.number().int().nonnegative().default(0),
   /** Paths of files successfully written during file_export. Append-only. */
   written_files: z.array(z.string()).default([]),
   /**
@@ -402,17 +501,47 @@ export function touch(state: PipelineState): PipelineState {
  * site instead of `errors: [...state.errors, message]`. Keeps the parallel
  * `error_kinds[]` array in lockstep with `errors[]`.
  *
+ * Bounded-I/O (Phase 1c): the errors/error_kinds arrays are capped at
+ * MAX_PIPELINE_ERRORS to stay within the Claude Code 100,000-char MCP response
+ * budget (get_pipeline_state format:"full" ships the whole state). When the
+ * cap is reached this performs FIFO eviction — the OLDEST entry is dropped so
+ * the most recent failures (the ones a caller acts on) survive. Eviction is
+ * NOT silent: the dropped count is recorded by incrementing the returned
+ * state's `errors_dropped` so observability is preserved (Phase 1c rule).
+ *
+ * Precondition: state.errors.length === state.error_kinds.length (lockstep
+ *   invariant, enforced by the PipelineStateSchema refine).
+ * Postcondition: result.errors.length === result.error_kinds.length AND
+ *   result.errors.length <= MAX_PIPELINE_ERRORS AND result.errors ends with
+ *   `message` (the new error is never the one evicted) AND
+ *   result.errors_dropped === state.errors_dropped + (1 if eviction occurred).
+ *
  * source: curie cross-audit H-2 (Phase 3+4, 2026-04). Tag taxonomy
  * extended to three kinds in curie H1 (Phase 3+4 follow-up, 2026-04).
+ * Bounded-I/O cap added Phase 1c (2026-06-10).
  */
 export function appendError(
   state: PipelineState,
   message: string,
   kind: "section_failure" | "structural" | "upstream_failure",
 ): PipelineState {
+  const nextErrors = [...state.errors, message];
+  const nextKinds = [...state.error_kinds, kind];
+  // FIFO eviction: once over cap, drop the oldest entry from BOTH arrays in
+  // lockstep. The append above already added the newest entry, so slicing the
+  // front keeps the most recent MAX_PIPELINE_ERRORS entries including `message`.
+  const overflow = nextErrors.length - MAX_PIPELINE_ERRORS;
+  if (overflow > 0) {
+    return {
+      ...state,
+      errors: nextErrors.slice(overflow),
+      error_kinds: nextKinds.slice(overflow),
+      errors_dropped: state.errors_dropped + overflow,
+    };
+  }
   return {
     ...state,
-    errors: [...state.errors, message],
-    error_kinds: [...state.error_kinds, kind],
+    errors: nextErrors,
+    error_kinds: nextKinds,
   };
 }
