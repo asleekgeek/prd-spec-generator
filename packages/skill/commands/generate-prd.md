@@ -115,6 +115,27 @@ get_pipeline_state({ run_id, format: "full" })
 
 The `errors[]` field in the returned state contains the full diagnostic trail.
 
+`format: "full"` is **bounded to the 100,000-char MCP response budget**. If the
+state is large (big codebase grounding, many clarification turns, long section
+markdown), the response degrades gracefully in priority order — least-relevant
+detail first — until it fits. Degradation is observable: a `__bounded` block
+lists every field that was omitted or elided and how many chars it reclaimed,
+and any omitted blob carries a `hint` for re-fetching it. The diagnostic
+skeleton (`errors[]`, statuses, scalars) is **never** shed, so the failure trail
+always survives. Shed order: `codebase_grounding`/`prd_validation` →
+oldest `clarifications` → `sections[].content`.
+
+To retrieve the full code-graph grounding that `format: "full"` sheds first,
+call:
+```
+get_pipeline_state({ run_id, format: "grounding" })
+```
+This returns `codebase_grounding` (+ `prd_validation` when the pair fits). At
+their input-cap worst case the two blobs together exceed the budget, so
+`format: "grounding"` may itself shed `prd_validation` to a stub — re-fetch it
+alone with `get_pipeline_state({ run_id, format: "validation" })`. Dynamic
+loading throughout — the detail is never lost, just fetched on demand.
+
 `get_pipeline_state` is **read-only** and does not advance the pipeline. Use it for diagnosis only.
 
 ---

@@ -14,6 +14,7 @@ export {
   appendError,
   MAX_CLARIFICATION_TURNS,
   MAX_PIPELINE_ERRORS,
+  MAX_RESPONSE_CHARS,
   type PipelineStep,
   type SectionStatus,
   type ClarificationTurn,

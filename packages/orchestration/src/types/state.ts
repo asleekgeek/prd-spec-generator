@@ -121,7 +121,10 @@ export type SectionStatus = z.infer<typeof SectionStatusSchema>;
  *   Cortex sibling repo's MAX_RESPONSE_CHARS = 100_000.
  */
 // source: Claude Code 2.1.170 binary cap (see block comment above).
-const MAX_RESPONSE_CHARS = 100_000;
+// Exported so the response boundary (mcp-server get_pipeline_state format:"full")
+// derives its single aggregate ceiling from the SAME measured constant the input
+// contracts use — no second, drifting copy of the budget (Phase 1d).
+export const MAX_RESPONSE_CHARS = 100_000;
 
 /**
  * Max clarification turns retained. A turn serializes to ~1,000 chars

@@ -242,7 +242,7 @@ For a failed agent: include `error`. The runner records an `INCONCLUSIVE` verdic
 { "kind": "failed", "reason": "...", "step": "input_analysis" }
 ```
 
-**Execute:** Display `messages` (if any), then `reason` and the failing `step`. **Stop the loop.** If the user wants more detail, call `get_pipeline_state(run_id, format: "full")` and show `state.errors[]`.
+**Execute:** Display `messages` (if any), then `reason` and the failing `step`. **Stop the loop.** If the user wants more detail, call `get_pipeline_state(run_id, format: "full")` and show `state.errors[]`. The `full` response is bounded to the 100,000-char MCP budget and degrades least-relevant detail first (grounding → oldest clarifications → section content); a `__bounded` block records anything omitted/elided, and `errors[]` is never shed. To pull the full code-graph grounding that `full` sheds first, call `get_pipeline_state(run_id, format: "grounding")`.
 
 ---
 

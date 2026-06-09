@@ -46,6 +46,10 @@ import {
   MAX_ATTEMPTS_BASELINE,
 } from "@prd-gen/benchmark";
 import { buildConcludeOpts } from "./build-conclude-opts.js";
+import {
+  boundFullStateResponse,
+  boundGroundingResponse,
+} from "./bound-full-state.js";
 
 const runStore = new InMemoryRunStore();
 
@@ -282,10 +286,19 @@ export function registerPipelineTools(server: McpServer): void {
 
   server.tool(
     "get_pipeline_state",
-    "Read the current pipeline state by run_id.",
+    "Read the current pipeline state by run_id. format:'summary' (default) returns " +
+    "the lightweight envelope; format:'full' returns the whole state, bounded to the " +
+    "Claude Code 100,000-char MCP response budget by shedding least-relevant detail " +
+    "first (observable __bounded markers; full grounding re-fetchable via " +
+    "format:'grounding'); format:'grounding' returns the codebase_grounding (+ " +
+    "prd_validation when it fits) blobs format:'full' sheds first; format:'validation' " +
+    "returns prd_validation alone (the blob format:'grounding' sheds when the pair " +
+    "overshoots).",
     {
       run_id: z.string(),
-      format: z.enum(["full", "summary"]).default("summary"),
+      format: z
+        .enum(["full", "summary", "grounding", "validation"])
+        .default("summary"),
     },
     async ({ run_id, format }) => {
       const state = runStore.get(run_id);
@@ -300,11 +313,41 @@ export function registerPipelineTools(server: McpServer): void {
           isError: true,
         };
       }
-      const body =
-        format === "full"
-          ? JSON.stringify(state, null, 2)
-          : JSON.stringify(envelope(state, null), null, 2);
-      return { content: [{ type: "text" as const, text: body }] };
+      let payload: unknown;
+      if (format === "full") {
+        // Bound the full-state serialization to the 100,000-char MCP budget.
+        // The per-field input caps (Phase 1c) overlap, so a worst-case state
+        // overshoots the AGGREGATE budget; boundFullStateResponse degrades by
+        // priority (grounding → clarifications → section content), recording
+        // every shed in __bounded. source: bound-full-state.ts.
+        payload = boundFullStateResponse(state);
+      } else if (format === "grounding") {
+        // The narrow re-fetch path for the blobs format:"full" sheds first.
+        // Each blob is bounded at the input contract (codebase_grounding ≈ 90k
+        // via PrdInputBundleSchema; prd_validation ≈ 10k). Each fits ALONE, but
+        // the two together at their caps reach ~100,257 wire chars — over budget.
+        // So this selector is itself bounded: codebase_grounding (the named
+        // purpose of this format) is kept; prd_validation rides only if it fits,
+        // else it is shed to a stub pointing at format:"validation". source:
+        // measured 2026-06-10 — grounding+validation at input caps = 100,257 >
+        // 100,000; boundGroundingResponse in bound-full-state.ts.
+        payload = boundGroundingResponse(state);
+      } else if (format === "validation") {
+        // Narrow re-fetch for prd_validation alone (the blob format:"grounding"
+        // sheds when grounding+validation together overshoot). Fits standalone:
+        // prd_validation is input-capped ≈ 10k. source: bound-full-state.ts.
+        payload = {
+          run_id: state.run_id,
+          prd_validation: state.prd_validation,
+        };
+      } else {
+        payload = envelope(state, null);
+      }
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(payload, null, 2) },
+        ],
+      };
     },
   );
 
