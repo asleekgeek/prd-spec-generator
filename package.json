@@ -9,7 +9,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:external-judge": "node --test scripts/external-judge/__tests__/*.test.mjs",
-    "lint": "tsc --noEmit",
+    "lint": "pnpm -r --workspace-concurrency=1 run lint",
     "clean": "pnpm -r clean && rm -f mcp-server/index.js",
     "verify": "pnpm install --frozen-lockfile && pnpm build && pnpm bundle && pnpm test"
   },
