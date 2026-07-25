@@ -21,14 +21,16 @@
       "better-sqlite3"
     ],
     "auditConfig": {
-      "//": "Issue #29: pnpm audit --prod --audit-level high is a HARD gate (ci.yml). These GHSAs are the exception, not a blanket ignore: each is a TRANSITIVE advisory that no change in this repo can resolve, so blocking on them would make the gate permanently red for reasons a contributor cannot act on (the automatised-pipeline #77 lesson). The one high advisory that WAS fixable in-diff — mathjs — is fixed (bumped to ^15.2.0), not ignored. Re-audit and remove entries when upstream publishes fixes: ajv (fast-uri) and @modelcontextprotocol/sdk (hono, js-yaml).",
+      "//": "Issue #29: pnpm audit --prod --audit-level high is a HARD gate (ci.yml). These GHSAs are documented exceptions, not a blanket ignore, so the gate still blocks any NEW high (AP #77 lesson: a gate permanently red for reasons a contributor cannot fix in-diff is a gate everyone skips). fast-uri (ajv) and hono/js-yaml (@modelcontextprotocol/sdk) are TRANSITIVE and only upstream can fix them. mathjs (GHSA-29qv-4j9f-fjw5, GHSA-jvff-x2qm-6286) is a direct dep of the PRIVATE, non-shipped packages/benchmark only, used by the math-oracle on trusted calibration expressions (not untrusted input) and absent from the shipped .mcpb; the patch is a 2-major bump that re-resolves the whole tree and churns the shipped bundle ~9k lines, out of scope here and tracked as a follow-up. Re-audit and drop entries as upstreams publish fixes.",
       "ignoreGhsas": [
         "GHSA-4c8g-83qw-93j6",
         "GHSA-q3j6-qgpj-74h6",
         "GHSA-v2hh-gcrm-f6hx",
         "GHSA-v39h-62p7-jpjc",
         "GHSA-52cp-r559-cp3m",
-        "GHSA-88fw-hqm2-52qc"
+        "GHSA-88fw-hqm2-52qc",
+        "GHSA-29qv-4j9f-fjw5",
+        "GHSA-jvff-x2qm-6286"
       ]
     }
   },

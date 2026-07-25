@@ -28,7 +28,7 @@
     "@prd-gen/strategy": "workspace:*",
     "@prd-gen/validation": "workspace:*",
     "ajv": "^8.17.1",
-    "mathjs": "^15.2.0",
+    "mathjs": "^13.0.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
