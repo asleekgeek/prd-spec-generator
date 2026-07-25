@@ -1,5 +1,64 @@
 # Security Policy
 
+## What the server accesses
+
+prd-spec-generator is an MCP server that turns a feature description into a
+9-file PRD. Its exposure, stated plainly:
+
+- **It runs as an MCP server in your session**, with the permissions your MCP
+  host grants it, and it reads/writes the PRD workspace files it is pointed at.
+- **It provisions runtime dependencies on first launch.** The distributed
+  `.mcpb` bundle externalises three runtime deps that `bin/ensure-deps.sh`
+  installs from the npm registry at first run — a pnpm workspace + lockfile is
+  exactly the shape npm supply-chain attacks target (a postinstall script in a
+  transitive dependency).
+- **It shells out to the ecosystem** (optional automatised-pipeline / Cortex
+  MCPs) only when you configure them.
+
+Because the delivered artifact is a bundled npm-derived `.mcpb`, "what is
+actually in this bundle" is a genuinely hard question — which is why the SBOM
+and the checksum guarantee below exist.
+
+## Supply-chain assurance
+
+As of issue #29, every release (`.github/workflows/release.yml`) ships:
+
+- **Build provenance** — the `.mcpb` bundle and the SBOM each carry a
+  Sigstore-backed build-provenance attestation. Verify a download binds to
+  this repository and workflow:
+
+  ```bash
+  gh attestation verify prd-spec-generator.mcpb --repo cdeust/prd-spec-generator
+  ```
+
+- **Checksum integrity, verified in the pipeline** — the `.mcpb` SHA-256 is
+  published as a `.sha256` companion **and** written into `server.json`
+  (`packages[0].file_sha256`, the value the MCP registry hands consumers). The
+  release job runs `scripts/release/verify-mcpb-checksum.mjs` and **fails the
+  release if server.json's checksum does not equal the built artifact** —
+  closing the #23 defect class (a published integrity value that did not match
+  the artifact), not just its instance. The assertion is unit-tested.
+
+- **SBOM** — `prd-spec-generator.cdx.json` (CycloneDX, generated from
+  `pnpm-lock.yaml`) enumerates the workspace dependency graph and accompanies
+  every release.
+
+- **Continuous checks** — `pnpm audit --prod --audit-level high` and
+  dependency review on PRs (`ci.yml`), CodeQL for JavaScript/TypeScript on a
+  schedule (`codeql.yml`), and OpenSSF Scorecard (`scorecard.yml`). The
+  Scorecard number is a recorded baseline, not a badge.
+
+**Not published to npm.** All workspace packages under `packages/` are
+`private: true`; nothing is published to the npm registry, so npm provenance
+(`npm publish --provenance`) has no artifact to sign. The distributed artifact
+is the `.mcpb`, which is attested above. If npm publishing is ever introduced,
+the release workflow already holds `id-token: write`, so `--provenance` is a
+one-line addition.
+
+**What this does NOT claim.** Provenance proves *who built the artifact and
+from which commit*, not that the source is free of defects; and it is worth
+nothing to a user who does not run the verification.
+
 ## Reporting a Vulnerability
 
 If you discover a security issue in this project, **do not** open a public

@@ -45,16 +45,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           # source: package.json declares pnpm v10 in pnpm-lock.yaml metadata.
           version: 10
 
       - name: Setup Node ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: pnpm
@@ -63,6 +63,18 @@ jobs:
         # --frozen-lockfile fails if pnpm-lock.yaml is stale; this keeps
         # CI's install identical to local development.
         run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies (fail on high severity, prod tree)
+        # Issue #29 criterion 5. npm is where the ecosystem's supply-chain
+        # attacks land (postinstall in a transitive dep), and a pnpm workspace
+        # with a lockfile is exactly the targeted shape. Scoped to --prod: a
+        # dev-only advisory does not ship in the .mcpb, and gating the whole
+        # matrix on it would make the audit a gate everyone learns to skip
+        # (the automatised-pipeline #77 lesson). High+ in the production tree
+        # is blocking; run once (Node 20 leg) since the advisory set is
+        # node-version-independent.
+        if: matrix.node-version == '20.x'
+        run: pnpm audit --prod --audit-level high
 
       - name: Build (sequential)
         # source: a non-sequential build raced package outputs and broke
@@ -97,5 +109,35 @@ jobs:
           fi
 
       - name: Test
-        # Vitest workspace runs every package's vitest.config.ts.
+        # Vitest workspace runs every package's vitest.config.ts, including the
+        # scripts/release project that regression-tests the #23 .mcpb-checksum
+        # class (issue #29 criterion 4).
         run: pnpm test
+
+  dependency-review:
+    name: dependency review (PR)
+    runs-on: ubuntu-latest
+    # Issue #29 criterion 5. Only meaningful on a pull_request (it diffs the
+    # PR's dependency change against the base); on push there is no base to
+    # compare, so the job is scoped to PRs.
+    #
+    # ADVISORY, not blocking: dependency-review-action requires GitHub's
+    # Dependency Graph, which is not enabled on this repository (the action
+    # errors "Dependency review is not supported on this repository"). Rather
+    # than a permanently-red required check for a repo-settings reason a
+    # contributor cannot fix in a diff, the step is continue-on-error and the
+    # HARD gate is `pnpm audit --prod --audit-level high` above (criterion 5's
+    # "or equivalent"). Enable Dependency Graph in repo settings and drop
+    # continue-on-error to make this enforcing.
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        continue-on-error: true
+        with:
+          fail-on-severity: high

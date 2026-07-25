@@ -16,6 +16,7 @@ export default defineConfig({
       "./packages/orchestration/vitest.config.ts",
       "./packages/validation/vitest.config.ts",
       "./packages/verification/vitest.config.ts",
+      "./scripts/release/vitest.config.ts",
     ],
   },
 });
