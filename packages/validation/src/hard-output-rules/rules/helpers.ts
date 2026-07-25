@@ -87,7 +87,18 @@ export function makeViolation(
  * Returns the inner content of each ```...``` block.
  */
 export function extractCodeBlocks(content: string): string[] {
-  const pattern = /```(?:\w+)?\s*\n([\s\S]*?)```/g;
+  // `\s*\n` is ambiguous: `\s` ALREADY matches `\n`, so the engine can split a
+  // run of newlines between the two in many ways, which is the polynomial
+  // backtracking CodeQL flags (js/polynomial-redos). The intent is "optional
+  // language tag, then the rest of the fence line, then the newline", so the
+  // horizontal-whitespace class says exactly that and is unambiguous.
+  //
+  // The trailing `(?:[ \t]*\r?\n)*` is NOT cosmetic: the old `\s*\n` also ate
+  // any BLANK LINES between the fence and the first line of code, and an
+  // equivalence check against the old regex caught that dropping it changed
+  // what the rules see. Each repetition is anchored to its own newline, so
+  // the run is consumed deterministically rather than by backtracking.
+  const pattern = /```(?:\w+)?[ \t]*\r?\n(?:[ \t]*\r?\n)*([\s\S]*?)```/g;
   const blocks: string[] = [];
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(content)) !== null) {
