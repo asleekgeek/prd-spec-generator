@@ -8,6 +8,44 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **MCP prompts capability** (#28): `prompts/list` + `prompts/get` publish the
+  pipeline ordering as enumerable protocol — `run_prd_pipeline(context, request)`
+  (coordinate_context_budget → start_pipeline → get_pipeline_state →
+  submit_action_result → plan_document_verification → conclude_verification) and
+  `verify_prd_document(run_id)`. Each step's one-line summary is pulled from the
+  live registered-tool description (the same schema `tools/list` advertises), so
+  the ordering is not hand-copied a third time — `packages/mcp-server/src/mcp-prompts.ts`.
+- **MCP tool profiles** (#28): `full`/`agent` profiles (`tool-profiles.ts`)
+  selected by `--profile` / `PRD_GEN_PROFILE`. `agent` advertises the 12
+  agent-facing generation/verification tools; `full` exposes all 17 including the
+  internal diagnostics (get_config, read_skill_config, check_health,
+  get_quality_history, get_strategy_effectiveness). Per-profile `initialize`
+  instructions.
+- **resources/list interop shim** (#28): the server now answers `resources/list`
+  and `resources/templates/list` with empty arrays and declares the resources
+  capability, so clients that probe resources regardless of declared capabilities
+  do not surface `-32601` as a failed connection (CBM upstream #958). Rationale
+  recorded at the use site in `index.ts` per §8.
+
+### Security
+
+- Internal diagnostics tools are **gated, not merely hidden** under the `agent`
+  profile (#28 criterion 5): an excluded tool is absent from `tools/list` AND
+  rejected on call (`RegisteredTool.disable()` → `-32602 "Tool … disabled"`).
+  Hiding from the list while still executing would be a hole, not an
+  optimization. Asserted by `packages/mcp-server/src/__tests__/mcp-prompts.test.ts`.
+
+### Changed
+
+- The default MCP tool profile is `full` (behaviour preserved). This diverges
+  from #28 criterion 3's "default to the agent-facing set": shrinking the
+  *default* advertised surface is a breaking change (a client that called a
+  now-hidden tool would break), so — mirroring automatised-pipeline's
+  `ToolProfile` and this parity wave's decision across all three repos — `full`
+  stays the default and `agent` is opt-in. No default behaviour change ships, so
+  `manifest.json` / `server.json` need no default update; the opt-in env
+  (`PRD_GEN_PROFILE`) is documented here.
+
 - Public-readiness baseline: LICENSE (MIT, sole independent author),
   CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md.
 - GitHub issue templates (bug / feature / audit-finding) and PR template

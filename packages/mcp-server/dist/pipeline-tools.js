@@ -173,7 +173,7 @@ function envelope(state, action, messages = []) {
 }
 export function registerPipelineTools(server) {
     // ─── start_pipeline ─────────────────────────────────────────────────────
-    server.tool("start_pipeline", "Initialize a new PRD pipeline run. Returns run_id and the first NextAction the host must execute.", {
+    const startPipeline = server.tool("start_pipeline", "Initialize a new PRD pipeline run. Returns run_id and the first NextAction the host must execute.", {
         feature_description: z
             .string()
             .describe("What the PRD is about — passed to all prompts"),
@@ -266,7 +266,7 @@ export function registerPipelineTools(server) {
         };
     });
     // ─── submit_action_result ──────────────────────────────────────────────────
-    server.tool("submit_action_result", "Feed an ActionResult to the pipeline runner; receive the next NextAction.", {
+    const submitActionResult = server.tool("submit_action_result", "Feed an ActionResult to the pipeline runner; receive the next NextAction.", {
         run_id: z.string(),
         // Use the canonical ActionResultSchema directly. Pre-fix this duplicated
         // the discriminated union inline; adding a new ActionResult kind would
@@ -326,7 +326,7 @@ export function registerPipelineTools(server) {
         }
     });
     // ─── get_pipeline_state ─────────────────────────────────────────────────
-    server.tool("get_pipeline_state", "Read the current pipeline state by run_id. format:'summary' (default) returns " +
+    const getPipelineState = server.tool("get_pipeline_state", "Read the current pipeline state by run_id. format:'summary' (default) returns " +
         "the lightweight envelope; format:'full' returns the whole state, bounded to the " +
         "Claude Code 100,000-char MCP response budget by shedding least-relevant detail " +
         "first (observable __bounded markers; full grounding re-fetchable via " +
@@ -407,7 +407,7 @@ export function registerPipelineTools(server) {
         };
     });
     // ─── plan_section_verification ─────────────────────────────────────────────
-    server.tool("plan_section_verification", "Extract claims from a PRD section and select judges. Returns JudgeRequest[] the host must execute via Agent tool in parallel.", {
+    const planSectionVerificationTool = server.tool("plan_section_verification", "Extract claims from a PRD section and select judges. Returns JudgeRequest[] the host must execute via Agent tool in parallel.", {
         section_type: SectionTypeSchema,
         content: z.string(),
         codebase_excerpts: z.array(z.string()).default([]),
@@ -428,7 +428,7 @@ export function registerPipelineTools(server) {
         };
     });
     // ─── plan_document_verification ────────────────────────────────────────────
-    server.tool("plan_document_verification", "Same as plan_section_verification but across all sections of a document.", {
+    const planDocumentVerificationTool = server.tool("plan_document_verification", "Same as plan_section_verification but across all sections of a document.", {
         sections: z
             .array(z.object({
             type: SectionTypeSchema,
@@ -453,7 +453,7 @@ export function registerPipelineTools(server) {
         };
     });
     // ─── conclude_verification ─────────────────────────────────────────────────
-    server.tool("conclude_verification", "Aggregate JudgeVerdict[] from spawned subagents into a VerificationReport (consensus + dissent). " +
+    const concludeVerification = server.tool("conclude_verification", "Aggregate JudgeVerdict[] from spawned subagents into a VerificationReport (consensus + dissent). " +
         "IMPORTANT: omitting claim_types when a reliability repository is open suppresses observation flushing " +
         "for this batch — the calibration data will be missing for these runs (one-sided censoring).", {
         scope: z.enum(["section", "document"]).default("section"),
@@ -538,5 +538,13 @@ export function registerPipelineTools(server) {
             ],
         };
     });
+    return {
+        start_pipeline: startPipeline,
+        submit_action_result: submitActionResult,
+        get_pipeline_state: getPipelineState,
+        plan_section_verification: planSectionVerificationTool,
+        plan_document_verification: planDocumentVerificationTool,
+        conclude_verification: concludeVerification,
+    };
 }
 //# sourceMappingURL=pipeline-tools.js.map

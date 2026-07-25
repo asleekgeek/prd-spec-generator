@@ -9,7 +9,7 @@ import { HardOutputRuleViolationSchema, } from "@prd-gen/core";
 import { calculateContextBudget, SECTION_RECALL_TEMPLATES, } from "./context-budget.js";
 import { mapFailuresToRetrievals } from "./failure-mapper.js";
 export function registerBudgetTools(server) {
-    server.tool("coordinate_context_budget", "Calculate token budget allocation for PRD generation. Returns per-section retrieval limits for Cortex recall, generation budgets, and section-specific query templates. Call this BEFORE starting section generation.", {
+    const coordinateContextBudget = server.tool("coordinate_context_budget", "Calculate token budget allocation for PRD generation. Returns per-section retrieval limits for Cortex recall, generation budgets, and section-specific query templates. Call this BEFORE starting section generation.", {
         prd_context: z
             .enum(["proposal", "feature", "bug", "incident", "poc", "mvp", "release", "cicd"])
             .describe("The PRD context type"),
@@ -33,7 +33,7 @@ export function registerBudgetTools(server) {
             ],
         };
     });
-    server.tool("map_failure_to_retrieval", "When validate_prd_section returns violations, call this to get corrective Cortex recall queries. Closes the validation→retrieval feedback loop so retries use better context.", {
+    const mapFailureToRetrieval = server.tool("map_failure_to_retrieval", "When validate_prd_section returns violations, call this to get corrective Cortex recall queries. Closes the validation→retrieval feedback loop so retries use better context.", {
         // Validate at the MCP boundary using the canonical domain schema
         // (HardOutputRuleViolationSchema). Pre-fix this used a hand-written
         // loose schema and an `as any` cast at the call site, defeating the
@@ -52,5 +52,9 @@ export function registerBudgetTools(server) {
             ],
         };
     });
+    return {
+        coordinate_context_budget: coordinateContextBudget,
+        map_failure_to_retrieval: mapFailureToRetrieval,
+    };
 }
 //# sourceMappingURL=budget-tools.js.map

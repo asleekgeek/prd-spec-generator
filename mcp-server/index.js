@@ -37437,7 +37437,7 @@ function mapFailuresToRetrievals(violations) {
 
 // packages/mcp-server/dist/budget-tools.js
 function registerBudgetTools(server2) {
-  server2.tool("coordinate_context_budget", "Calculate token budget allocation for PRD generation. Returns per-section retrieval limits for Cortex recall, generation budgets, and section-specific query templates. Call this BEFORE starting section generation.", {
+  const coordinateContextBudget = server2.tool("coordinate_context_budget", "Calculate token budget allocation for PRD generation. Returns per-section retrieval limits for Cortex recall, generation budgets, and section-specific query templates. Call this BEFORE starting section generation.", {
     prd_context: external_exports.enum(["proposal", "feature", "bug", "incident", "poc", "mvp", "release", "cicd"]).describe("The PRD context type"),
     completed_sections: external_exports.array(external_exports.string()).default([]).describe("Section types already generated"),
     context_window_size: external_exports.number().int().default(2e5).describe("Total context window size in tokens")
@@ -37452,7 +37452,7 @@ function registerBudgetTools(server2) {
       ]
     };
   });
-  server2.tool("map_failure_to_retrieval", "When validate_prd_section returns violations, call this to get corrective Cortex recall queries. Closes the validation\u2192retrieval feedback loop so retries use better context.", {
+  const mapFailureToRetrieval = server2.tool("map_failure_to_retrieval", "When validate_prd_section returns violations, call this to get corrective Cortex recall queries. Closes the validation\u2192retrieval feedback loop so retries use better context.", {
     // Validate at the MCP boundary using the canonical domain schema
     // (HardOutputRuleViolationSchema). Pre-fix this used a hand-written
     // loose schema and an `as any` cast at the call site, defeating the
@@ -37467,6 +37467,10 @@ function registerBudgetTools(server2) {
       ]
     };
   });
+  return {
+    coordinate_context_budget: coordinateContextBudget,
+    map_failure_to_retrieval: mapFailureToRetrieval
+  };
 }
 
 // packages/benchmark/dist/src/runner.js
@@ -82175,7 +82179,7 @@ function envelope(state, action, messages = []) {
   };
 }
 function registerPipelineTools(server2) {
-  server2.tool("start_pipeline", "Initialize a new PRD pipeline run. Returns run_id and the first NextAction the host must execute.", {
+  const startPipeline = server2.tool("start_pipeline", "Initialize a new PRD pipeline run. Returns run_id and the first NextAction the host must execute.", {
     feature_description: external_exports.string().describe("What the PRD is about \u2014 passed to all prompts"),
     codebase_path: external_exports.string().optional().describe("Absolute path to the codebase. Triggers index_codebase via automatised-pipeline."),
     skip_preflight: external_exports.boolean().optional().describe("If true, skip the preflight step that probes Cortex (and ai-architect when codebase_path is set). Default false. Use only when you accept degraded section generation without persistent memory recall.")
@@ -82221,7 +82225,7 @@ function registerPipelineTools(server2) {
       ]
     };
   });
-  server2.tool("submit_action_result", "Feed an ActionResult to the pipeline runner; receive the next NextAction.", {
+  const submitActionResult = server2.tool("submit_action_result", "Feed an ActionResult to the pipeline runner; receive the next NextAction.", {
     run_id: external_exports.string(),
     // Use the canonical ActionResultSchema directly. Pre-fix this duplicated
     // the discriminated union inline; adding a new ActionResult kind would
@@ -82273,7 +82277,7 @@ function registerPipelineTools(server2) {
       inFlight.delete(run_id);
     }
   });
-  server2.tool("get_pipeline_state", "Read the current pipeline state by run_id. format:'summary' (default) returns the lightweight envelope; format:'full' returns the whole state, bounded to the Claude Code 100,000-char MCP response budget by shedding least-relevant detail first (observable __bounded markers; full grounding re-fetchable via format:'grounding'); format:'grounding' returns the codebase_grounding (+ prd_validation when it fits) blobs format:'full' sheds first; format:'validation' returns prd_validation alone (the blob format:'grounding' sheds when the pair overshoots); format:'action' returns the UNBOUNDED last action emitted for this run (including full spawn_subagents prompts) \u2014 the recovery path when a start_pipeline/submit_action_result response carries a __bounded marker on its action.", {
+  const getPipelineState = server2.tool("get_pipeline_state", "Read the current pipeline state by run_id. format:'summary' (default) returns the lightweight envelope; format:'full' returns the whole state, bounded to the Claude Code 100,000-char MCP response budget by shedding least-relevant detail first (observable __bounded markers; full grounding re-fetchable via format:'grounding'); format:'grounding' returns the codebase_grounding (+ prd_validation when it fits) blobs format:'full' sheds first; format:'validation' returns prd_validation alone (the blob format:'grounding' sheds when the pair overshoots); format:'action' returns the UNBOUNDED last action emitted for this run (including full spawn_subagents prompts) \u2014 the recovery path when a start_pipeline/submit_action_result response carries a __bounded marker on its action.", {
     run_id: external_exports.string(),
     format: external_exports.enum(["full", "summary", "grounding", "validation", "action"]).default("summary")
   }, { readOnlyHint: true }, async ({ run_id, format: format5 }) => {
@@ -82313,7 +82317,7 @@ function registerPipelineTools(server2) {
       ]
     };
   });
-  server2.tool("plan_section_verification", "Extract claims from a PRD section and select judges. Returns JudgeRequest[] the host must execute via Agent tool in parallel.", {
+  const planSectionVerificationTool = server2.tool("plan_section_verification", "Extract claims from a PRD section and select judges. Returns JudgeRequest[] the host must execute via Agent tool in parallel.", {
     section_type: SectionTypeSchema,
     content: external_exports.string(),
     codebase_excerpts: external_exports.array(external_exports.string()).default([]),
@@ -82333,7 +82337,7 @@ function registerPipelineTools(server2) {
       ]
     };
   });
-  server2.tool("plan_document_verification", "Same as plan_section_verification but across all sections of a document.", {
+  const planDocumentVerificationTool = server2.tool("plan_document_verification", "Same as plan_section_verification but across all sections of a document.", {
     sections: external_exports.array(external_exports.object({
       type: SectionTypeSchema,
       content: external_exports.string()
@@ -82355,7 +82359,7 @@ function registerPipelineTools(server2) {
       ]
     };
   });
-  server2.tool("conclude_verification", "Aggregate JudgeVerdict[] from spawned subagents into a VerificationReport (consensus + dissent). IMPORTANT: omitting claim_types when a reliability repository is open suppresses observation flushing for this batch \u2014 the calibration data will be missing for these runs (one-sided censoring).", {
+  const concludeVerification = server2.tool("conclude_verification", "Aggregate JudgeVerdict[] from spawned subagents into a VerificationReport (consensus + dissent). IMPORTANT: omitting claim_types when a reliability repository is open suppresses observation flushing for this batch \u2014 the calibration data will be missing for these runs (one-sided censoring).", {
     scope: external_exports.enum(["section", "document"]).default("section"),
     section_type: SectionTypeSchema.optional(),
     verdicts: external_exports.array(JudgeVerdictSchema),
@@ -82401,6 +82405,141 @@ function registerPipelineTools(server2) {
       ]
     };
   });
+  return {
+    start_pipeline: startPipeline,
+    submit_action_result: submitActionResult,
+    get_pipeline_state: getPipelineState,
+    plan_section_verification: planSectionVerificationTool,
+    plan_document_verification: planDocumentVerificationTool,
+    conclude_verification: concludeVerification
+  };
+}
+
+// packages/mcp-server/dist/mcp-prompts.js
+var PRD_CONTEXTS = [
+  "proposal",
+  "feature",
+  "bug",
+  "incident",
+  "poc",
+  "mvp",
+  "release",
+  "cicd"
+];
+var RUN_PIPELINE_STEPS = [
+  { tool: "coordinate_context_budget", guidance: "Allocate the per-section token budget BEFORE generating anything." },
+  { tool: "start_pipeline", guidance: "Initialize the run; it returns the first NextAction to execute." },
+  { tool: "get_pipeline_state", guidance: "Read the current state by run_id whenever you need to re-orient." },
+  { tool: "submit_action_result", guidance: "Feed each executed action's result back; repeat until the action is `done`." },
+  { tool: "plan_document_verification", guidance: "Once sections exist, emit the JudgeRequest[] across the whole document." },
+  { tool: "conclude_verification", guidance: "Aggregate the JudgeVerdict[] into the final VerificationReport." }
+];
+var VERIFY_DOCUMENT_STEPS = [
+  { tool: "get_pipeline_state", guidance: "Load the run's current sections by run_id." },
+  { tool: "plan_document_verification", guidance: "Emit the cross-section JudgeRequest[] to execute." },
+  { tool: "submit_action_result", guidance: "Return each judge batch's verdicts to the reducer." },
+  { tool: "validate_prd_document", guidance: "Run the deterministic Hard Output Rules pass (SP arithmetic, AC numbering, coverage)." },
+  { tool: "conclude_verification", guidance: "Aggregate verdicts into the VerificationReport." }
+];
+var PROMPT_STEP_TOOLS = {
+  run_prd_pipeline: RUN_PIPELINE_STEPS.map((s) => s.tool),
+  verify_prd_document: VERIFY_DOCUMENT_STEPS.map((s) => s.tool)
+};
+var PROMPT_NAMES = Object.keys(PROMPT_STEP_TOOLS);
+function firstSentence(description, tool) {
+  if (!description)
+    return `\`${tool}\``;
+  const idx = description.indexOf(". ");
+  return idx === -1 ? description : description.slice(0, idx + 1);
+}
+function renderBody(intro, steps, closing, summaryOf) {
+  const lines = [
+    intro,
+    "",
+    "prd-gen's tools are a pipeline and the order is the product \u2014 calling them out of order leaves the pipeline in a wrong state, not an error. Work them in this order:",
+    ""
+  ];
+  steps.forEach((step2, i2) => {
+    lines.push(`${i2 + 1}. \`${step2.tool}\` \u2014 ${firstSentence(summaryOf(step2.tool), step2.tool)} ${step2.guidance}`);
+  });
+  lines.push("", closing);
+  return lines.join("\n");
+}
+function textResult(text) {
+  return { messages: [{ role: "user", content: { type: "text", text } }] };
+}
+function registerPrompts(server2, summaryOf) {
+  const runPipeline = server2.registerPrompt("run_prd_pipeline", {
+    title: "Run the PRD generation pipeline",
+    description: "Drive the staged PRD generation + verification pipeline in the correct order.",
+    argsSchema: {
+      context: external_exports.enum(PRD_CONTEXTS).describe("Context \u2014 the PRD context type (proposal, feature, bug, \u2026)."),
+      request: external_exports.string().describe("Request \u2014 what the PRD should cover (the feature/incident/proposal to spec).")
+    }
+  }, ({ context, request }) => textResult(renderBody(`Generate a "${context}" PRD for: ${request}`, RUN_PIPELINE_STEPS, "Never skip coordinate_context_budget or submit out of order \u2014 the reducer advances one NextAction at a time and a skipped stage silently mis-states the run.", summaryOf)));
+  const verifyDocument = server2.registerPrompt("verify_prd_document", {
+    title: "Verify a PRD document",
+    description: "Run the document-verification loop and deterministic checks over a pipeline run.",
+    argsSchema: {
+      run_id: external_exports.string().describe("Run id \u2014 the pipeline run whose document should be verified.")
+    }
+  }, ({ run_id }) => textResult(renderBody(`Verify the PRD document for pipeline run "${run_id}".`, VERIFY_DOCUMENT_STEPS, "conclude_verification only aggregates verdicts you actually submitted \u2014 do not conclude before every planned JudgeRequest has a returned verdict.", summaryOf)));
+  return { run_prd_pipeline: runPipeline, verify_prd_document: verifyDocument };
+}
+
+// packages/mcp-server/dist/tool-profiles.js
+var PROFILES = ["full", "agent"];
+var PROFILE_FLAG = "--profile";
+var PROFILE_ENV_VAR = "PRD_GEN_PROFILE";
+var INTERNAL_TOOL_NAMES = [
+  "get_config",
+  "read_skill_config",
+  "check_health",
+  "get_quality_history",
+  "get_strategy_effectiveness"
+];
+var INTERNAL_SET = new Set(INTERNAL_TOOL_NAMES);
+function isAllowed(profile, toolName) {
+  if (profile === "full")
+    return true;
+  return !INTERNAL_SET.has(toolName);
+}
+function parseProfile(value) {
+  if (PROFILES.includes(value)) {
+    return value;
+  }
+  throw new Error(`invalid profile '${value}': expected 'full' or 'agent'`);
+}
+function resolveProfile(argv, env) {
+  const flagValue = flagValueOf(argv);
+  if (flagValue !== void 0)
+    return parseProfile(flagValue);
+  const envValue = env[PROFILE_ENV_VAR];
+  if (envValue)
+    return parseProfile(envValue);
+  return "full";
+}
+function flagValueOf(argv) {
+  let found;
+  for (let i2 = 0; i2 < argv.length; i2++) {
+    const arg2 = argv[i2];
+    if (arg2 === PROFILE_FLAG) {
+      const next = argv[i2 + 1];
+      if (next === void 0) {
+        throw new Error(`${PROFILE_FLAG} requires a value: 'full' or 'agent'`);
+      }
+      found = next;
+      i2++;
+    } else if (arg2.startsWith(PROFILE_FLAG + "=")) {
+      found = arg2.slice(PROFILE_FLAG.length + 1);
+    }
+  }
+  return found;
+}
+var FULL_INSTRUCTIONS = "prd-gen \u2014 staged PRD generation + verification MCP ('full' profile: every tool; the default). The tools are a pipeline and the order is the product; calling them out of order does not error, it leaves the pipeline in a wrong state. Generation loop: coordinate_context_budget \u2192 start_pipeline \u2192 get_pipeline_state \u2192 submit_action_result (repeat until done). Verification: plan_document_verification / plan_section_verification \u2192 submit_action_result \u2192 conclude_verification. Deterministic checks: validate_prd_section, validate_prd_document, map_failure_to_retrieval. Internal diagnostics (get_config, read_skill_config, check_health, get_quality_history, get_strategy_effectiveness) are also exposed here. The run_prd_pipeline and verify_prd_document prompts (prompts/list) publish the ordering as protocol. Restart with --profile agent for the agent-facing subset only.";
+var AGENT_INSTRUCTIONS = "prd-gen \u2014 staged PRD generation + verification MCP ('agent' profile: the agent-facing generation/verification surface). The tools are a pipeline and the order is the product; calling them out of order leaves the pipeline in a wrong state, not an error. Generation loop: coordinate_context_budget \u2192 start_pipeline \u2192 get_pipeline_state \u2192 submit_action_result (repeat until done). Verification: plan_document_verification / plan_section_verification \u2192 submit_action_result \u2192 conclude_verification, with validate_prd_section / validate_prd_document and map_failure_to_retrieval for deterministic checks. The internal diagnostics/telemetry tools are hidden AND rejected on call in this profile; restart with --profile full to expose them. The run_prd_pipeline and verify_prd_document prompts guide the flow.";
+function instructions(profile) {
+  return profile === "agent" ? AGENT_INSTRUCTIONS : FULL_INSTRUCTIONS;
 }
 
 // packages/mcp-server/dist/index.js
@@ -82431,10 +82570,19 @@ function loadSkillMd() {
   }
   return "SKILL.md not found";
 }
+var ACTIVE_PROFILE = resolveProfile(process.argv.slice(2), process.env);
 var server = new McpServer({
   name: "prd-gen",
   version: "0.4.0"
+}, {
+  // Per-profile initialize instructions (issue #28 criterion 4).
+  instructions: instructions(ACTIVE_PROFILE)
 });
+server.server.registerCapabilities({ resources: {} });
+server.server.setRequestHandler(ListResourcesRequestSchema, () => ({ resources: [] }));
+server.server.setRequestHandler(ListResourceTemplatesRequestSchema, () => ({
+  resourceTemplates: []
+}));
 var _evidenceRepo = void 0;
 function getEvidenceRepo() {
   if (_evidenceRepo === void 0) {
@@ -82442,19 +82590,19 @@ function getEvidenceRepo() {
   }
   return _evidenceRepo;
 }
-server.tool("get_config", "Get the full skill configuration", {}, { readOnlyHint: true }, async () => {
+var toolGetConfig = server.tool("get_config", "Get the full skill configuration", {}, { readOnlyHint: true }, async () => {
   const config5 = loadSkillConfig();
   return {
     content: [{ type: "text", text: JSON.stringify(config5, null, 2) }]
   };
 });
-server.tool("read_skill_config", "Read the SKILL.md content that drives PRD generation", {}, { readOnlyHint: true }, async () => {
+var toolReadSkillConfig = server.tool("read_skill_config", "Read the SKILL.md content that drives PRD generation", {}, { readOnlyHint: true }, async () => {
   const skillMd = loadSkillMd();
   return {
     content: [{ type: "text", text: skillMd }]
   };
 });
-server.tool("check_health", "Check system health \u2014 verify all components are accessible", {}, { readOnlyHint: true }, async () => {
+var toolCheckHealth = server.tool("check_health", "Check system health \u2014 verify all components are accessible", {}, { readOnlyHint: true }, async () => {
   const configAvailable = loadSkillConfig().version !== void 0;
   const skillAvailable = loadSkillMd() !== "SKILL.md not found";
   let dbHealthy = false;
@@ -82482,7 +82630,7 @@ server.tool("check_health", "Check system health \u2014 verify all components ar
     ]
   };
 });
-server.tool("get_prd_context_info", "Get configuration for a specific PRD context type", {
+var toolGetPrdContextInfo = server.tool("get_prd_context_info", "Get configuration for a specific PRD context type", {
   context: external_exports.enum([
     "proposal",
     "feature",
@@ -82499,7 +82647,7 @@ server.tool("get_prd_context_info", "Get configuration for a specific PRD contex
     content: [{ type: "text", text: JSON.stringify(config5, null, 2) }]
   };
 });
-server.tool("list_available_strategies", "List thinking strategies available to the pipeline.", {}, { readOnlyHint: true }, async () => {
+var toolListStrategies = server.tool("list_available_strategies", "List thinking strategies available to the pipeline.", {}, { readOnlyHint: true }, async () => {
   return {
     content: [
       {
@@ -82512,7 +82660,7 @@ server.tool("list_available_strategies", "List thinking strategies available to 
     ]
   };
 });
-server.tool("validate_prd_section", "Run deterministic Hard Output Rules validation on a single PRD section. Returns violations found \u2014 zero LLM calls, pure regex/parsing.", {
+var toolValidateSection = server.tool("validate_prd_section", "Run deterministic Hard Output Rules validation on a single PRD section. Returns violations found \u2014 zero LLM calls, pure regex/parsing.", {
   content: external_exports.string().describe("The markdown content of the PRD section"),
   section_type: SectionTypeSchema.describe("The type of PRD section being validated")
 }, { readOnlyHint: true }, async ({ content, section_type }) => {
@@ -82523,7 +82671,7 @@ server.tool("validate_prd_section", "Run deterministic Hard Output Rules validat
     ]
   };
 });
-server.tool("validate_prd_document", "Run full document validation including cross-section checks (SP arithmetic, AC numbering, FR-AC coverage, test traceability). Returns comprehensive validation report.", {
+var toolValidateDocument = server.tool("validate_prd_document", "Run full document validation including cross-section checks (SP arithmetic, AC numbering, FR-AC coverage, test traceability). Returns comprehensive validation report.", {
   sections: external_exports.array(external_exports.object({
     // Validate at MCP boundary so the cast at the call site is
     // unnecessary. Pre-fix: `z.string()` + `s.type as SectionType`.
@@ -82539,7 +82687,7 @@ server.tool("validate_prd_document", "Run full document validation including cro
     ]
   };
 });
-server.tool("get_quality_history", "Get historical PRD quality scores from the evidence repository", {
+var toolQualityHistory = server.tool("get_quality_history", "Get historical PRD quality scores from the evidence repository", {
   limit: external_exports.number().int().min(1).max(200).default(20).describe("Maximum number of records to return")
 }, { readOnlyHint: true }, async ({ limit }) => {
   const repo = getEvidenceRepo();
@@ -82563,7 +82711,7 @@ server.tool("get_quality_history", "Get historical PRD quality scores from the e
     ]
   };
 });
-server.tool("get_strategy_effectiveness", "Get strategy performance data \u2014 actual vs expected improvement, compliance rate", {
+var toolStrategyEffectiveness = server.tool("get_strategy_effectiveness", "Get strategy performance data \u2014 actual vs expected improvement, compliance rate", {
   min_executions: external_exports.number().int().min(1).default(5).describe("Minimum executions required to include a strategy")
 }, { readOnlyHint: true }, async ({ min_executions }) => {
   const repo = getEvidenceRepo();
@@ -82594,8 +82742,33 @@ server.tool("get_strategy_effectiveness", "Get strategy performance data \u2014 
     ]
   };
 });
-registerBudgetTools(server);
-registerPipelineTools(server);
+var budgetHandles = registerBudgetTools(server);
+var pipelineHandles = registerPipelineTools(server);
+var ALL_TOOL_HANDLES = {
+  get_config: toolGetConfig,
+  read_skill_config: toolReadSkillConfig,
+  check_health: toolCheckHealth,
+  get_prd_context_info: toolGetPrdContextInfo,
+  list_available_strategies: toolListStrategies,
+  validate_prd_section: toolValidateSection,
+  validate_prd_document: toolValidateDocument,
+  get_quality_history: toolQualityHistory,
+  get_strategy_effectiveness: toolStrategyEffectiveness,
+  ...budgetHandles,
+  ...pipelineHandles
+};
+var promptHandles = registerPrompts(server, (toolName) => ALL_TOOL_HANDLES[toolName]?.description);
+if (ACTIVE_PROFILE !== "full") {
+  for (const [name315, handle] of Object.entries(ALL_TOOL_HANDLES)) {
+    if (!isAllowed(ACTIVE_PROFILE, name315))
+      handle.disable();
+  }
+  for (const [name315, handle] of Object.entries(promptHandles)) {
+    const steps = PROMPT_STEP_TOOLS[name315] ?? [];
+    if (!steps.every((tool) => isAllowed(ACTIVE_PROFILE, tool)))
+      handle.disable();
+  }
+}
 async function main2() {
   const reliabilityHealth = checkReliabilityHealth();
   if (!reliabilityHealth.healthy) {

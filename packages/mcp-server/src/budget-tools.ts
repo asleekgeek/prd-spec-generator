@@ -5,7 +5,7 @@
  * 500-line cap (rules/coding-standards.md §4.1).
  */
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer, RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
   HardOutputRuleViolationSchema,
@@ -17,8 +17,8 @@ import {
 } from "./context-budget.js";
 import { mapFailuresToRetrievals } from "./failure-mapper.js";
 
-export function registerBudgetTools(server: McpServer): void {
-  server.tool(
+export function registerBudgetTools(server: McpServer): Record<string, RegisteredTool> {
+  const coordinateContextBudget = server.tool(
     "coordinate_context_budget",
     "Calculate token budget allocation for PRD generation. Returns per-section retrieval limits for Cortex recall, generation budgets, and section-specific query templates. Call this BEFORE starting section generation.",
     {
@@ -57,7 +57,7 @@ export function registerBudgetTools(server: McpServer): void {
     },
   );
 
-  server.tool(
+  const mapFailureToRetrieval = server.tool(
     "map_failure_to_retrieval",
     "When validate_prd_section returns violations, call this to get corrective Cortex recall queries. Closes the validation→retrieval feedback loop so retries use better context.",
     {
@@ -82,4 +82,9 @@ export function registerBudgetTools(server: McpServer): void {
       };
     },
   );
+
+  return {
+    coordinate_context_budget: coordinateContextBudget,
+    map_failure_to_retrieval: mapFailureToRetrieval,
+  };
 }
