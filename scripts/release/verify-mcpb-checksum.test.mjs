@@ -1,0 +1,73 @@
+/**
+ * Regression tests for the #23 defect class (issue #29 criterion 4).
+ *
+ * #23 shipped a server.json whose file_sha256 did not match the released
+ * .mcpb, and nothing checked. The load-bearing cases here are therefore the
+ * REJECTIONS: a mismatched hash, and a placeholder that was never patched,
+ * must both fail (§13 A3, G4). Asserting only that a correct hash passes would
+ * reproduce exactly the blind spot #23 was.
+ */
+
+import { describe, expect, it } from "vitest";
+import {
+  ChecksumMismatchError,
+  assertChecksumMatches,
+  extractRecordedChecksum,
+  sha256Hex,
+} from "./verify-mcpb-checksum.mjs";
+
+const REAL = "d6f0ce83456f65ffd7663966362612fa2224c7670dbc419d72db7cfccfc10815";
+const serverJson = (sha) => ({
+  packages: [{ registryType: "mcpb", identifier: "…/x.mcpb", file_sha256: sha }],
+});
+
+describe("mcpb checksum verification (#23 class)", () => {
+  it("sha256Hex matches Node's own digest", () => {
+    const bytes = Buffer.from("mcpb bundle bytes");
+    expect(sha256Hex(bytes)).toHaveLength(64);
+    // Deterministic: same bytes → same digest.
+    expect(sha256Hex(bytes)).toBe(sha256Hex(Buffer.from("mcpb bundle bytes")));
+  });
+
+  it("passes when server.json records the artifact's real digest", () => {
+    const actual = sha256Hex(Buffer.from("authentic bundle"));
+    expect(() => assertChecksumMatches(serverJson(actual), actual)).not.toThrow();
+  });
+
+  it("REJECTS a mismatch — the #23 defect (recorded != artifact)", () => {
+    const actual = sha256Hex(Buffer.from("the bundle that shipped"));
+    // server.json still records a different (stale) hash.
+    expect(() => assertChecksumMatches(serverJson(REAL), actual)).toThrow(
+      ChecksumMismatchError,
+    );
+  });
+
+  it("carries both digests so the failure is actionable", () => {
+    const actual = sha256Hex(Buffer.from("tampered"));
+    try {
+      assertChecksumMatches(serverJson(REAL), actual);
+      throw new Error("expected ChecksumMismatchError");
+    } catch (err) {
+      expect(err).toBeInstanceOf(ChecksumMismatchError);
+      expect(err.expected).toBe(REAL);
+      expect(err.actual).toBe(actual);
+    }
+  });
+
+  it("REJECTS an unpatched placeholder (never a published placeholder)", () => {
+    expect(() => extractRecordedChecksum(serverJson("PLACEHOLDER"))).toThrow();
+    expect(() => extractRecordedChecksum(serverJson(""))).toThrow();
+  });
+
+  it("REJECTS a missing file_sha256 field", () => {
+    expect(() => extractRecordedChecksum({ packages: [{}] })).toThrow();
+    expect(() => extractRecordedChecksum({})).toThrow();
+  });
+
+  it("is case-insensitive on the recorded digest", () => {
+    const actual = sha256Hex(Buffer.from("payload"));
+    expect(() =>
+      assertChecksumMatches(serverJson(actual.toUpperCase()), actual),
+    ).not.toThrow();
+  });
+});

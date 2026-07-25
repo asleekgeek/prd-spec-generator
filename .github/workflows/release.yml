@@ -1,31 +1,49 @@
 name: Release
 
+# Supply-chain hardening (issue #29). This repo's distributed artifact is the
+# `.mcpb` bundle attached to the GitHub Release and referenced by server.json
+# in the MCP registry; the marketplace consumes the git tree. All workspace
+# packages are `private: true` and NOTHING is published to npm, so npm
+# provenance (issue #29 criterion 2) has no artifact to attest — see the
+# per-job notes. What this workflow now does:
+#   * attests build provenance for the .mcpb and the SBOM (Sigstore; verify
+#     with `gh attestation verify <file> --repo cdeust/prd-spec-generator`);
+#   * generates a CycloneDX SBOM from pnpm-lock.yaml covering the workspace;
+#   * VERIFIES server.json's file_sha256 equals the built .mcpb before it is
+#     committed/published — closing the #23 defect class in the pipeline, not
+#     just its instance (scripts/release/verify-mcpb-checksum.mjs);
+#   * pins every third-party action to a commit SHA.
+
 on:
   push:
     tags:
       - "v*.*.*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
     name: Build, test, and publish release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write       # create the release, upload assets, push server.json
+      id-token: write       # OIDC token Sigstore exchanges for a signing cert
+      attestations: write   # record the build-provenance statement on the repo
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22.x
           cache: pnpm
@@ -98,6 +116,28 @@ jobs:
           echo "SHA256: $(cat "${OUTFILE}.sha256")"
           echo "MCPB_SHA256=$(cat "${OUTFILE}.sha256")" >> "$GITHUB_ENV"
 
+      - name: Generate CycloneDX SBOM from pnpm-lock.yaml
+        run: |
+          set -euo pipefail
+          # cdxgen reads pnpm-lock.yaml directly and walks the workspace, so
+          # "what is actually in this bundle" — a genuinely hard question for a
+          # bundled npm artifact (issue #29) — is answerable. Pinned by version;
+          # this is an npm package, not a GitHub Action, so the SHA-pin rule
+          # (criterion 8) does not apply, but the version is fixed so the run is
+          # reproducible. FETCH_LICENSE stays off to keep the job network-light.
+          npx -y @cyclonedx/cdxgen@12.8.2 -t pnpm --spec-version 1.5 \
+            -o prd-spec-generator.cdx.json
+          node -e "JSON.parse(require('fs').readFileSync('prd-spec-generator.cdx.json','utf8'))"
+          echo "SBOM components: $(node -e "console.log((JSON.parse(require('fs').readFileSync('prd-spec-generator.cdx.json','utf8')).components||[]).length)")"
+          shasum -a 256 prd-spec-generator.cdx.json | awk '{print $1}' > prd-spec-generator.cdx.json.sha256
+
+      - name: Attest build provenance (.mcpb + SBOM)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: |
+            prd-spec-generator.mcpb
+            prd-spec-generator.cdx.json
+
       - name: Patch server.json with the real .mcpb checksum
         run: |
           set -euo pipefail
@@ -114,6 +154,16 @@ jobs:
           mv server.json.tmp server.json
           jq empty server.json
           echo "Patched file_sha256: $(jq -r '.packages[0].file_sha256' server.json)"
+
+      # Close the #23 defect class in the pipeline (issue #29 criterion 4): the
+      # value we are about to publish MUST equal the artifact we built. This
+      # recomputes the .mcpb digest and rejects any mismatch (exit 1) before
+      # server.json is committed or the registry sees it. The same assertion is
+      # unit-tested in scripts/release/verify-mcpb-checksum.test.mjs.
+      - name: Verify server.json checksum matches the built .mcpb
+        run: |
+          node scripts/release/verify-mcpb-checksum.mjs \
+            prd-spec-generator.mcpb server.json
 
       - name: Commit and push patched server.json to main
         run: |
@@ -152,8 +202,8 @@ jobs:
           echo "### .mcpb bundle" >> release-notes.md
           echo "SHA-256: \`${MCPB_SHA256}\`" >> release-notes.md
 
-      - name: Create GitHub Release (with .mcpb artifact)
-        uses: softprops/action-gh-release@v2
+      - name: Create GitHub Release (with .mcpb artifact + SBOM)
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           body_path: release-notes.md
           draft: false
@@ -161,5 +211,7 @@ jobs:
           files: |
             prd-spec-generator.mcpb
             prd-spec-generator.mcpb.sha256
+            prd-spec-generator.cdx.json
+            prd-spec-generator.cdx.json.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
