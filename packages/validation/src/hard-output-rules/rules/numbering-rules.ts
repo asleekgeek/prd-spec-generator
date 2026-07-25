@@ -48,13 +48,24 @@ export function checkFRTraceability(
   content: string,
   sectionType: SectionType,
 ): HardOutputRuleViolation[] {
-  const tableHeaderPattern =
-    /^\s*\|[^\n]*\bID\b[^\n]*(?:Requirement|Description)[^\n]*\|/gim;
+  // Both header probes previously chained three `[^\n]*` runs, which backtrack
+  // against one another and made match time polynomial in line length
+  // (js/polynomial-redos) on LLM-generated PRD text. Asked per line instead:
+  // a header row is a table row that mentions ID and the other column word.
+  // `\bID\b` is kept as a word-boundary regex so "GRID"/"IDENTIFIER" still do
+  // not count as an ID column; only the unbounded `[^\n]*` runs are gone.
+  const ID_WORD = /\bID\b/i;
+  const isTableRow = (line: string): boolean => line.trimStart().startsWith("|");
+  const hasHeaderWith = (words: readonly string[]): boolean =>
+    content.split("\n").some((line) => {
+      if (!isTableRow(line) || !ID_WORD.test(line)) return false;
+      const lower = line.toLowerCase();
+      return words.some((w) => lower.includes(w));
+    });
 
-  if (!tableHeaderPattern.test(content)) return [];
+  if (!hasHeaderWith(["requirement", "description"])) return [];
 
-  const sourcePattern = /^\s*\|[^\n]*\bID\b[^\n]*\bSource\b[^\n]*\|/gim;
-  if (!sourcePattern.test(content)) {
+  if (!hasHeaderWith(["source"])) {
     return [
       makeViolation(
         "fr_traceability",
