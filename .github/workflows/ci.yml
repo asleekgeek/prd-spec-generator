@@ -120,6 +120,15 @@ jobs:
     # Issue #29 criterion 5. Only meaningful on a pull_request (it diffs the
     # PR's dependency change against the base); on push there is no base to
     # compare, so the job is scoped to PRs.
+    #
+    # ADVISORY, not blocking: dependency-review-action requires GitHub's
+    # Dependency Graph, which is not enabled on this repository (the action
+    # errors "Dependency review is not supported on this repository"). Rather
+    # than a permanently-red required check for a repo-settings reason a
+    # contributor cannot fix in a diff, the step is continue-on-error and the
+    # HARD gate is `pnpm audit --prod --audit-level high` above (criterion 5's
+    # "or equivalent"). Enable Dependency Graph in repo settings and drop
+    # continue-on-error to make this enforcing.
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
@@ -129,5 +138,6 @@ jobs:
 
       - name: Dependency review
         uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        continue-on-error: true
         with:
           fail-on-severity: high
