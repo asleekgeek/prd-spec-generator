@@ -1,0 +1,23 @@
+name: "prd-spec-generator CodeQL config"
+
+# Scope the analysis to SOURCE. This is not a suppression of findings — it is
+# pointing the analyser at code a human writes.
+#
+# `mcp-server/index.js` is an esbuild bundle: 82,817 lines produced by
+# `pnpm bundle` from `packages/mcp-server/dist/index.js` (see package.json
+# "bundle"). It is committed because the .mcpb ships it, but nobody edits it.
+#
+# It accounted for 436 of the repo's 517 open alerts — 84% — and every one was
+# a property of esbuild's codegen (`js/useless-expression`, the `__require`
+# shim's type comparisons, its inlined sanitizers), not a defect anyone can fix
+# without patching a bundler. Alerts nobody can act on are worse than no
+# alerts: 436 unactionable rows bury the ~81 real findings in first-party code,
+# and a security tab everyone has learned to ignore protects nothing.
+#
+# The SOURCE that produces the bundle — packages/mcp-server/src/** — remains
+# fully analysed, so a defect that reaches the bundle is still caught, at the
+# line a developer can actually change.
+paths-ignore:
+  - "mcp-server/index.js"      # esbuild output; source is packages/mcp-server/src
+  - "**/dist/**"               # per-package tsc output
+  - "**/node_modules/**"

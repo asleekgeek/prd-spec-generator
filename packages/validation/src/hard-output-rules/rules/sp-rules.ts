@@ -23,12 +23,24 @@ export function checkUnevenSPDistribution(
   content: string,
   sectionType: SectionType,
 ): HardOutputRuleViolation[] {
-  const sprintPattern =
-    /(?:sprint|iteration)\s*\d+[^|]*?\|\s*(\d+)\s*(?:SP|story\s*points?)/gim;
+  // Matched per LINE rather than across the whole document. The previous
+  // single regex used `\d+[^|]*?\|`, where the digit run and the lazy any-run
+  // compete for the same characters — polynomial backtracking on a row of many
+  // digits (js/polynomial-redos). Since a sprint and its SP always live in one
+  // table row, scanning line by line is both linear and closer to the rule's
+  // actual meaning.
+  //
+  // Semantics preserved exactly: a line still has to name sprint/iteration
+  // FOLLOWED BY A NUMBER (so "Sprint planning | 5 SP" is not a sprint row),
+  // and the SP cell is still `| <digits> SP|story points`.
+  const sprintLabel = /(?:sprint|iteration)\s*\d+/i;
+  const spCell = /\|\s*(\d+)\s*(?:SP|story\s*points?)/i;
 
   const spValues: number[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = sprintPattern.exec(content)) !== null) {
+  for (const line of content.split("\n")) {
+    if (!sprintLabel.test(line)) continue;
+    const match = spCell.exec(line);
+    if (!match) continue;
     const val = parseInt(match[1], 10);
     if (!isNaN(val)) spValues.push(val);
   }

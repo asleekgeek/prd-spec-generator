@@ -162,13 +162,36 @@ export function checkRiskMitigationCompleteness(
   content: string,
   sectionType: SectionType,
 ): HardOutputRuleViolation[] {
-  const headerPattern =
-    /^\s*\|[^\n]*(?:Risk|Threat)[^\n]*(?:Mitigation|Response|Action)[^\n]*\|/gim;
-  if (!headerPattern.test(content)) return [];
+  // Header detection is a per-line substring question, so ask it that way.
+  // The previous regex chained three `[^\n]*` runs, which backtrack against
+  // each other and made match time polynomial in line length
+  // (js/polynomial-redos). This input is LLM-generated PRD text, so a
+  // pathological line stalls the validation pipeline rather than merely being
+  // slow. Splitting on lines and testing membership is linear and reads as
+  // what the rule actually means.
+  const RISK_WORDS = ["risk", "threat"];
+  const ACTION_WORDS = ["mitigation", "response", "action"];
+  const hasRiskHeader = content.split("\n").some((line) => {
+    const trimmed = line.trimStart();
+    if (!trimmed.startsWith("|")) return false;
+    const lower = trimmed.toLowerCase();
+    return (
+      RISK_WORDS.some((w) => lower.includes(w)) &&
+      ACTION_WORDS.some((w) => lower.includes(w))
+    );
+  });
+  if (!hasRiskHeader) return [];
 
   const rowPattern = /^\s*\|(?!\s*[-:]+\s*\|)(.+)\|/gm;
   const violations: HardOutputRuleViolation[] = [];
-  const emptyMitigationPattern = /^\s*(?:-|N\/?A|TBD|TODO|None)?\s*$/i;
+  // `^\s*(...)?\s*$` puts two unbounded `\s*` runs either side of an optional
+  // group: on a whitespace-only cell the engine can split the run at every
+  // position, which is the ' ' repetition CodeQL flagged. A trim plus a set
+  // membership test is linear, and states the rule plainly: the cell is empty
+  // or one of the placeholder tokens.
+  const PLACEHOLDER_MITIGATIONS = new Set(["", "-", "n/a", "na", "tbd", "todo", "none"]);
+  const isPlaceholderMitigation = (cell: string): boolean =>
+    PLACEHOLDER_MITIGATIONS.has(cell.trim().toLowerCase());
 
   let index = 0;
   let match: RegExpExecArray | null;
@@ -187,7 +210,7 @@ export function checkRiskMitigationCompleteness(
     const lastCell = cells[cells.length - 1];
     if (lastCell === undefined) continue;
 
-    if (emptyMitigationPattern.test(lastCell)) {
+    if (isPlaceholderMitigation(lastCell)) {
       const riskDescription = cells[0] ?? "Unknown";
       violations.push(
         makeViolation(
