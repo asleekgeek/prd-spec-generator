@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -28,6 +32,13 @@ type EvidenceRepositoryLike = EvidenceRepository;
 import { validateSection, validateDocument } from "@prd-gen/validation";
 import { registerBudgetTools } from "./budget-tools.js";
 import { registerPipelineTools } from "./pipeline-tools.js";
+import { registerPrompts, PROMPT_STEP_TOOLS } from "./mcp-prompts.js";
+import {
+  resolveProfile,
+  instructions as profileInstructions,
+  isAllowed,
+  type ToolProfile,
+} from "./tool-profiles.js";
 import {
   checkReliabilityHealth,
   getConsensusReliabilityProvider,
@@ -84,10 +95,35 @@ function loadSkillMd(): string {
 
 // ─── Server Setup ────────────────────────────────────────────────────────────
 
-const server = new McpServer({
-  name: "prd-gen",
-  version: "0.4.0",
-});
+// Active tool profile (issue #28). Resolved once at startup from --profile /
+// PRD_GEN_PROFILE, defaulting to `full`. Default stays `full` (documented
+// divergence from #28 criterion 3) because shrinking the default advertised
+// surface is breaking — see tool-profiles.ts + CHANGELOG.md.
+const ACTIVE_PROFILE: ToolProfile = resolveProfile(process.argv.slice(2), process.env);
+
+const server = new McpServer(
+  {
+    name: "prd-gen",
+    version: "0.4.0",
+  },
+  {
+    // Per-profile initialize instructions (issue #28 criterion 4).
+    instructions: profileInstructions(ACTIVE_PROFILE),
+  },
+);
+
+// resources/list interop shim (issue #28 criterion 6). The MCP TS SDK only
+// answers resources/list once a resource is registered; with none registered
+// it returns -32601, which some clients surface as a failed connection
+// regardless of declared capabilities (CBM upstream #958). We register the
+// resources capability and empty list handlers so probing clients get an
+// interoperable empty answer. Rationale recorded here at the use site per §8.
+// source: DeusData/codebase-memory-mcp src/mcp/mcp.c:10810-10816 (#958).
+server.server.registerCapabilities({ resources: {} });
+server.server.setRequestHandler(ListResourcesRequestSchema, () => ({ resources: [] }));
+server.server.setRequestHandler(ListResourceTemplatesRequestSchema, () => ({
+  resourceTemplates: [],
+}));
 
 // Lazy-init evidence repository (only when better-sqlite3 is available).
 // `tryCreateEvidenceRepository` returns null if the native module is
@@ -103,7 +139,7 @@ function getEvidenceRepo(): EvidenceRepositoryLike | null {
 
 // ─── Tool 1: get_config ──────────────────────────────────────────────────────
 
-server.tool(
+const toolGetConfig = server.tool(
   "get_config",
   "Get the full skill configuration",
   {},
@@ -118,7 +154,7 @@ server.tool(
 
 // ─── Tool 2: read_skill_config ───────────────────────────────────────────────
 
-server.tool(
+const toolReadSkillConfig = server.tool(
   "read_skill_config",
   "Read the SKILL.md content that drives PRD generation",
   {},
@@ -133,7 +169,7 @@ server.tool(
 
 // ─── Tool 3: check_health ────────────────────────────────────────────────────
 
-server.tool(
+const toolCheckHealth = server.tool(
   "check_health",
   "Check system health — verify all components are accessible",
   {},
@@ -176,7 +212,7 @@ server.tool(
 
 // ─── Tool 4: get_prd_context_info ────────────────────────────────────────────
 
-server.tool(
+const toolGetPrdContextInfo = server.tool(
   "get_prd_context_info",
   "Get configuration for a specific PRD context type",
   {
@@ -204,7 +240,7 @@ server.tool(
 
 // ─── Tool 5: list_available_strategies ───────────────────────────────────────
 
-server.tool(
+const toolListStrategies = server.tool(
   "list_available_strategies",
   "List thinking strategies available to the pipeline.",
   {},
@@ -230,7 +266,7 @@ server.tool(
 
 // ─── Tool 6: validate_prd_section ────────────────────────────────────────────
 
-server.tool(
+const toolValidateSection = server.tool(
   "validate_prd_section",
   "Run deterministic Hard Output Rules validation on a single PRD section. Returns violations found — zero LLM calls, pure regex/parsing.",
   {
@@ -255,7 +291,7 @@ server.tool(
 
 // ─── Tool 7: validate_prd_document ───────────────────────────────────────────
 
-server.tool(
+const toolValidateDocument = server.tool(
   "validate_prd_document",
   "Run full document validation including cross-section checks (SP arithmetic, AC numbering, FR-AC coverage, test traceability). Returns comprehensive validation report.",
   {
@@ -284,7 +320,7 @@ server.tool(
 
 // ─── Tool 8: get_quality_history ─────────────────────────────────────────────
 
-server.tool(
+const toolQualityHistory = server.tool(
   "get_quality_history",
   "Get historical PRD quality scores from the evidence repository",
   {
@@ -323,7 +359,7 @@ server.tool(
 
 // ─── Tool 9: get_strategy_effectiveness ──────────────────────────────────────
 
-server.tool(
+const toolStrategyEffectiveness = server.tool(
   "get_strategy_effectiveness",
   "Get strategy performance data — actual vs expected improvement, compliance rate",
   {
@@ -372,7 +408,7 @@ server.tool(
 
 // ─── Budget + feedback tools (extracted to budget-tools.ts) ──────────────────
 
-registerBudgetTools(server);
+const budgetHandles = registerBudgetTools(server);
 
 // Legacy tools (initialize_pipeline / update_pipeline_state) were removed
 // in v3.0.0. The pipeline tools (start_pipeline / submit_action_result /
@@ -381,7 +417,47 @@ registerBudgetTools(server);
 
 // ─── Pipeline / verification tools (orchestration + verification) ────────────
 
-registerPipelineTools(server);
+const pipelineHandles = registerPipelineTools(server);
+
+// ─── Prompts + profile enforcement (issue #28) ───────────────────────────────
+//
+// Every registered tool by name — one map, the single source of truth for both
+// the prompt step summaries (criterion 2) and the profile gate (criterion 5).
+const ALL_TOOL_HANDLES: Record<string, RegisteredTool> = {
+  get_config: toolGetConfig,
+  read_skill_config: toolReadSkillConfig,
+  check_health: toolCheckHealth,
+  get_prd_context_info: toolGetPrdContextInfo,
+  list_available_strategies: toolListStrategies,
+  validate_prd_section: toolValidateSection,
+  validate_prd_document: toolValidateDocument,
+  get_quality_history: toolQualityHistory,
+  get_strategy_effectiveness: toolStrategyEffectiveness,
+  ...budgetHandles,
+  ...pipelineHandles,
+};
+
+// Prompt bodies pull each step's one-line summary from the live tool
+// description — the same schema tools/list advertises, never a hand-copy.
+const promptHandles = registerPrompts(
+  server,
+  (toolName) => ALL_TOOL_HANDLES[toolName]?.description,
+);
+
+// Apply the active profile: disable (hide AND reject-on-call) every tool the
+// profile excludes, and every prompt that drives an excluded tool. `.disable()`
+// removes the tool from tools/list AND makes tools/call throw — a hidden tool
+// is not merely absent from the list, it is rejected on call (criterion 5).
+// Under `full` this loop is a no-op.
+if (ACTIVE_PROFILE !== "full") {
+  for (const [name, handle] of Object.entries(ALL_TOOL_HANDLES)) {
+    if (!isAllowed(ACTIVE_PROFILE, name)) handle.disable();
+  }
+  for (const [name, handle] of Object.entries(promptHandles)) {
+    const steps = PROMPT_STEP_TOOLS[name] ?? [];
+    if (!steps.every((tool) => isAllowed(ACTIVE_PROFILE, tool))) handle.disable();
+  }
+}
 
 // ─── Start Server ────────────────────────────────────────────────────────────
 

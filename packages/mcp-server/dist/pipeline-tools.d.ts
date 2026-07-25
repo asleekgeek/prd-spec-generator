@@ -13,6 +13,6 @@
  * The host (Claude Code) drives the loop: call start, execute the action,
  * call submit_action_result with the result, repeat until `done`.
  */
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-export declare function registerPipelineTools(server: McpServer): void;
+import type { McpServer, RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
+export declare function registerPipelineTools(server: McpServer): Record<string, RegisteredTool>;
 //# sourceMappingURL=pipeline-tools.d.ts.map

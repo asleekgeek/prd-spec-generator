@@ -4,6 +4,6 @@
  * Extracted from index.ts to keep the composition root below the
  * 500-line cap (rules/coding-standards.md §4.1).
  */
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-export declare function registerBudgetTools(server: McpServer): void;
+import type { McpServer, RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
+export declare function registerBudgetTools(server: McpServer): Record<string, RegisteredTool>;
 //# sourceMappingURL=budget-tools.d.ts.map

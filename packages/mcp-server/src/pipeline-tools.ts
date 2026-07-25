@@ -14,7 +14,7 @@
  * call submit_action_result with the result, repeat until `done`.
  */
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer, RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
   newPipelineState,
@@ -216,10 +216,10 @@ function envelope(
   };
 }
 
-export function registerPipelineTools(server: McpServer): void {
+export function registerPipelineTools(server: McpServer): Record<string, RegisteredTool> {
   // ─── start_pipeline ─────────────────────────────────────────────────────
 
-  server.tool(
+  const startPipeline = server.tool(
     "start_pipeline",
     "Initialize a new PRD pipeline run. Returns run_id and the first NextAction the host must execute.",
     {
@@ -335,7 +335,7 @@ export function registerPipelineTools(server: McpServer): void {
 
   // ─── submit_action_result ──────────────────────────────────────────────────
 
-  server.tool(
+  const submitActionResult = server.tool(
     "submit_action_result",
     "Feed an ActionResult to the pipeline runner; receive the next NextAction.",
     {
@@ -406,7 +406,7 @@ export function registerPipelineTools(server: McpServer): void {
 
   // ─── get_pipeline_state ─────────────────────────────────────────────────
 
-  server.tool(
+  const getPipelineState = server.tool(
     "get_pipeline_state",
     "Read the current pipeline state by run_id. format:'summary' (default) returns " +
     "the lightweight envelope; format:'full' returns the whole state, bounded to the " +
@@ -491,7 +491,7 @@ export function registerPipelineTools(server: McpServer): void {
 
   // ─── plan_section_verification ─────────────────────────────────────────────
 
-  server.tool(
+  const planSectionVerificationTool = server.tool(
     "plan_section_verification",
     "Extract claims from a PRD section and select judges. Returns JudgeRequest[] the host must execute via Agent tool in parallel.",
     {
@@ -520,7 +520,7 @@ export function registerPipelineTools(server: McpServer): void {
 
   // ─── plan_document_verification ────────────────────────────────────────────
 
-  server.tool(
+  const planDocumentVerificationTool = server.tool(
     "plan_document_verification",
     "Same as plan_section_verification but across all sections of a document.",
     {
@@ -555,7 +555,7 @@ export function registerPipelineTools(server: McpServer): void {
 
   // ─── conclude_verification ─────────────────────────────────────────────────
 
-  server.tool(
+  const concludeVerification = server.tool(
     "conclude_verification",
     "Aggregate JudgeVerdict[] from spawned subagents into a VerificationReport (consensus + dissent). " +
     "IMPORTANT: omitting claim_types when a reliability repository is open suppresses observation flushing " +
@@ -657,4 +657,13 @@ export function registerPipelineTools(server: McpServer): void {
       };
     },
   );
+
+  return {
+    start_pipeline: startPipeline,
+    submit_action_result: submitActionResult,
+    get_pipeline_state: getPipelineState,
+    plan_section_verification: planSectionVerificationTool,
+    plan_document_verification: planDocumentVerificationTool,
+    conclude_verification: concludeVerification,
+  };
 }
