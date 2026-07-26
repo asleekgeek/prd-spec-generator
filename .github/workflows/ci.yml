@@ -128,7 +128,14 @@ jobs:
         # Vitest workspace runs every package's vitest.config.ts, including the
         # scripts/release project that regression-tests the #23 .mcpb-checksum
         # class (issue #29 criterion 4).
-        run: pnpm test
+        #
+        # --coverage because the 80% statement floor is a GATE: vitest exits
+        # non-zero below it (verified — raising the threshold to 95 produces
+        # "ERROR: Coverage for statements (81.17%) does not meet global
+        # threshold (95%)" and exit 1). Run on the Node 20 leg only; coverage
+        # is a property of the code, not of the runtime, and instrumenting both
+        # legs doubles the cost for an identical number.
+        run: ${{ matrix.node-version == '20.x' && 'pnpm test:coverage' || 'pnpm test' }}
 
       - name: Test (external-judge harness)
         # scripts/external-judge runs on node:test, not vitest, so `pnpm test`

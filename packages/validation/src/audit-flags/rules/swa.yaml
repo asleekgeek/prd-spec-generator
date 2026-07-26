@@ -239,7 +239,7 @@ rules:
     test_fixtures:
       should_flag:
         - section: source_code
-          content: "// Would need 26+ member declarations to trigger"
+          content: "func m0() func m1() func m2() func m3() func m4() func m5() func m6() func m7() func m8() func m9() func m10() func m11() func m12() func m13() func m14() func m15() func m16() func m17() func m18() func m19() func m20() func m21() func m22() func m23() func m24() func m25()"
       should_pass:
         - section: source_code
           content: "struct Config {\n    let host: String\n    let port: Int\n}"

@@ -11,21 +11,71 @@ import type { SectionType } from "@prd-gen/core";
 
 // ─── Pattern helpers ─────────────────────────────────────────────────────────
 
-export function testRegex(pattern: string, text: string): RegExpMatchArray[] {
+/**
+ * Leading PCRE/Python inline-flag group, e.g. `(?mi)` or `(?i)`.
+ *
+ * The rule YAML is written in that dialect, but JavaScript has no such
+ * construct: `new RegExp("(?mi)^x")` throws `SyntaxError: Invalid group`.
+ * Restricted to the flag letters JavaScript can actually honour, so an
+ * unsupported dialect flag falls through to the compile attempt and is
+ * reported rather than silently mistranslated.
+ */
+const INLINE_FLAGS = /^\(\?([imsu]+)\)/;
+
+/** Patterns already reported, so a rule evaluated per-section warns once. */
+const reportedBadPatterns = new Set<string>();
+
+/**
+ * Compile a rule pattern, translating a leading inline-flag group into real
+ * RegExp flags.
+ *
+ * Returns null when the pattern cannot compile, and says so on stderr the
+ * first time it sees that pattern. The silence this replaces was expensive:
+ * 142 of the 217 patterns in the shipped rule corpus used `(?i)` or `(?mi)`,
+ * every one of them threw on construction, and both callers swallowed the
+ * throw and returned "no match". The engine loaded those rules, evaluated
+ * them, found nothing, and reported a clean document — so roughly two thirds
+ * of the audit rules were inert while looking healthy. A failure this quiet is
+ * indistinguishable from a passing document, which is the whole reason it
+ * survived (§13 F1: every failure mode emits an actionable signal).
+ */
+export function compilePattern(pattern: string, baseFlags = "gm"): RegExp | null {
+  let source = pattern;
+  let flags = baseFlags;
+
+  const inline = INLINE_FLAGS.exec(pattern);
+  if (inline) {
+    source = pattern.slice(inline[0].length);
+    for (const f of inline[1]) {
+      if (!flags.includes(f)) flags += f;
+    }
+  }
+
   try {
-    const re = new RegExp(pattern, "gm");
-    return [...text.matchAll(re)];
-  } catch {
-    return [];
+    return new RegExp(source, flags);
+  } catch (err) {
+    if (!reportedBadPatterns.has(pattern)) {
+      reportedBadPatterns.add(pattern);
+      const reason = err instanceof Error ? err.message : String(err);
+      process.stderr.write(
+        `[audit-flags] rule pattern did not compile and will never match: ${pattern}\n` +
+          `[audit-flags]   ${reason}\n`,
+      );
+    }
+    return null;
   }
 }
 
+export function testRegex(pattern: string, text: string): RegExpMatchArray[] {
+  const re = compilePattern(pattern);
+  if (re === null) return [];
+  return [...text.matchAll(re)];
+}
+
 export function hasMatch(pattern: string, text: string): boolean {
-  try {
-    return new RegExp(pattern, "gm").test(text);
-  } catch {
-    return false;
-  }
+  const re = compilePattern(pattern);
+  if (re === null) return false;
+  return re.test(text);
 }
 
 // ─── Section helpers ─────────────────────────────────────────────────────────

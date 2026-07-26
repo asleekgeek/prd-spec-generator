@@ -48,11 +48,41 @@ export function opExtractTable(
 ): void {
   const content = combineSections(sections, rule.sections);
   const name = (op.into ?? op.store_as) as string;
-  if (hasMatch(op.header_pattern as string, content)) {
-    vars[name] = content.split("\n").filter((l) => l.includes("|"));
-  } else {
+  if (!hasMatch(op.header_pattern as string, content)) {
     vars[name] = [];
+    return;
   }
+
+  const rows = content.split("\n").filter((l) => l.includes("|"));
+
+  // `value_column` narrows the extraction to one column's cells. Without it a
+  // rule comparing "mitigation text" was really comparing whole table rows,
+  // so the row's ID and pipes diluted every similarity score below any useful
+  // threshold — cons.yaml#002 could not fire on its own fixture because of it.
+  const valueColumn = op.value_column as string | undefined;
+  if (valueColumn === undefined) {
+    vars[name] = rows;
+    return;
+  }
+
+  const cellsOf = (row: string): string[] =>
+    row.split("|").map((c) => c.trim()).filter((c) => c.length > 0);
+
+  const headerRow = rows.find((r) => hasMatch(valueColumn, r));
+  const columnIndex = headerRow
+    ? cellsOf(headerRow).findIndex((c) => hasMatch(valueColumn, c))
+    : -1;
+
+  if (columnIndex === -1) {
+    vars[name] = [];
+    return;
+  }
+
+  const isSeparator = (row: string) => /^[\s|:-]+$/.test(row);
+  vars[name] = rows
+    .filter((r) => r !== headerRow && !isSeparator(r))
+    .map((r) => cellsOf(r)[columnIndex])
+    .filter((c): c is string => c !== undefined && c.length > 0);
 }
 
 export function opCount(
