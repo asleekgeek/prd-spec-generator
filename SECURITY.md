@@ -86,20 +86,23 @@ this team size, while the approval count honestly reports zero rather than
 laundering a self-approval into a green metric. This is revisited the moment a
 second maintainer joins.
 
-**`CIIBestPracticesID` is declined for the same structural reason.** The project
-IS registered — [bestpractices.dev/projects/13832](https://www.bestpractices.dev/projects/13832),
-badge shown in the README — and registering it moved the check from 0 to 2.
-Closing the finding outright takes more than that: Scorecard's
-`checks/evaluation/cii_best_practices.go` awards its maximum only for the
-**gold** badge (silver 7, passing 5, in progress 2) and reports a finding at any
-score below maximum. Gold requires the `contributors_unassociated` criterion —
-at least two significant contributors not associated with each other — which is
-the same wall as `CodeReviewID`, and not one a single-maintainer project clears
-by doing better engineering.
+**`CIIBestPracticesID` is declined for the same structural reason, and no badge
+is displayed.** Scorecard's `checks/evaluation/cii_best_practices.go` awards its
+maximum only for the **gold** badge (silver 7, passing 5, in progress 2) and
+reports a finding at any score below maximum. Gold is not reachable here: it
+requires `contributors_unassociated` (at least two significant contributors not
+associated with each other) **and** `two_person_review` (at least half of all
+proposed modifications reviewed by someone other than their author). Both need a
+second person, which is the same wall as `CodeReviewID` and not one a
+single-maintainer project clears by doing better engineering.
 
-Completing the questionnaire to **passing** is worthwhile on its own merits and
-is ordinary maintenance from here; it raises the score to 5 without closing the
-alert.
+Since gold is out of reach, the badge is deliberately **not shown**. A badge
+reading `in progress — 0%` is a worse signal than no badge: it advertises an
+unfinished self-assessment as though it were an assurance, and the reader has to
+know the tier system to tell those apart. The honest artifacts are the ones
+above — an empty audit ignore list, integrity-verified provisioning,
+least-privilege tokens, branch protection, property-based tests — each of which
+a reader can verify from this repository rather than from a shield.
 
 ## Reporting a Vulnerability
 

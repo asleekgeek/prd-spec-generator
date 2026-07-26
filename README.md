@@ -5,7 +5,6 @@
 </p>
 
 <p align="center">
-  <a href="https://www.bestpractices.dev/projects/13832"><img src="https://www.bestpractices.dev/projects/13832/badge" alt="OpenSSF Best Practices"></a>
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License">
   <img src="https://img.shields.io/badge/TypeScript-7.0+-3178c6.svg" alt="TypeScript 7.0+">
   <img src="https://img.shields.io/badge/Node-20.x_·_22.x-339933.svg" alt="Node 20/22">
