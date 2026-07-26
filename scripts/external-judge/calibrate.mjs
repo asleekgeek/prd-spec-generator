@@ -29,15 +29,19 @@
  *   node calibrate.mjs --provider mistral --min-agreement 0.8
  */
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 import { resolveConfig } from "./lib/config.mjs";
 import { runJudge } from "./lib/judge-core.mjs";
 import { buildClaimPrompt } from "./lib/prompt-builder.mjs";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const GROUND_TRUTH_PATH = join(__dirname, "fixtures", "ground-truth.json");
+// Imported as a MODULE, not read with `readFileSync`, and the difference is
+// the point. Every claim's evidence is posted to a third-party LLM endpoint,
+// so a runtime read makes the corpus substitutable at run time — point the
+// harness at another path and its contents leave the machine (CodeQL
+// js/file-access-to-http). A static import fixes the corpus at the one
+// version-controlled artifact the module graph resolves; there is no path
+// variable to redirect. Node ≥20.10 supports the `with` attribute unflagged
+// (verified on 20.20.2 and 22.x, the CI matrix) — no warning on stderr,
+// which judge.mjs's contract depends on staying clean.
+import groundTruthFixture from "./fixtures/ground-truth.json" with { type: "json" };
 
 /**
  * @param {string[]} argv
@@ -62,16 +66,19 @@ function parseFlags(argv) {
 }
 
 /**
- * Load and validate the ground-truth fixture.
- * @param {string} path
+ * Validate and return the statically imported ground-truth fixture.
+ *
+ * Takes no path: the corpus is the imported module (see the import comment),
+ * so there is nothing to point elsewhere. The shape check stays — an import
+ * guarantees the file parsed, not that it still holds claims.
+ *
+ * Postcondition: returns the fixture; throws when it carries no claims.
  */
-export function loadGroundTruth(path) {
-  const raw = readFileSync(path, "utf8");
-  const parsed = JSON.parse(raw);
-  if (!Array.isArray(parsed.claims) || parsed.claims.length === 0) {
-    throw new Error(`loadGroundTruth: ${path} has no claims`);
+export function loadGroundTruth() {
+  if (!Array.isArray(groundTruthFixture.claims) || groundTruthFixture.claims.length === 0) {
+    throw new Error("loadGroundTruth: fixtures/ground-truth.json has no claims");
   }
-  return parsed;
+  return groundTruthFixture;
 }
 
 /**
@@ -163,7 +170,7 @@ async function main() {
   const threshold = Number(flags.minAgreement ?? 0.7);
   const config = resolveConfig(flags, process.env);
 
-  const groundTruth = loadGroundTruth(GROUND_TRUTH_PATH);
+  const groundTruth = loadGroundTruth();
   const rows = await runCalibration(groundTruth, config, runJudge);
   const summaryObj = summarize(rows);
 

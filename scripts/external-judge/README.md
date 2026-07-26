@@ -33,12 +33,15 @@ scripts/external-judge/
                             run_mrlqa0aj_u2rh15 — same fixture source as
                             packages/verification/src/__tests__/claim-tier.test.ts)
     01-prd-precorrection-us01.md   AC-008 ONLY: historical/reconstructed
-                            pre-correction US-01 text (see "AC-008 is judged
-                            on historical text" below)
+                            pre-correction US-01 text. PROVENANCE ONLY — the
+                            text itself is inlined in ground-truth.json and a
+                            test pins the two byte-for-byte (see "AC-008 is
+                            judged on historical text" below)
     10-verification-report.md   the real jury report this run's ground truth is
                             transcribed from
-    ground-truth.json      10 claims, claim-scoped evidence (or prompt_source
-                            for AC-008), recorded verdicts
+    ground-truth.json      10 claims, claim-scoped inline evidence, recorded
+                            verdicts. Loaded by static `import ... with
+                            { type: "json" }`, never read at run time
   __tests__/               node --test unit tests (no network)
 ```
 
@@ -73,16 +76,16 @@ scripts/external-judge/
 ## Running a single judge call
 
 ```bash
-# From a prompt file:
-node scripts/external-judge/judge.mjs --provider gemini --prompt-file /tmp/prompt.txt
+# From a prompt file (the shell opens it — judge.mjs itself opens no files):
+node scripts/external-judge/judge.mjs --provider gemini < /tmp/prompt.txt
 
-# From stdin:
+# From a pipe:
 cat /tmp/prompt.txt | node scripts/external-judge/judge.mjs --provider mistral
 
 # Custom (non-preset) OpenAI-compatible endpoint:
 node scripts/external-judge/judge.mjs \
   --base-url https://my-endpoint/v1/ --model my-model --api-key sk-... \
-  --prompt-file /tmp/prompt.txt
+  < /tmp/prompt.txt
 ```
 
 Output (stdout, one JSON line):
@@ -139,10 +142,13 @@ separately; do not admit a judge on agreement rate alone.
 
 **AC-008 is judged on historical text, not `fixtures/01-prd.md`.** Every
 other claim's evidence is a claim-scoped excerpt of `fixtures/01-prd.md`
-(the corrected PRD). AC-008 is the exception: its `ground-truth.json`
-entry carries a `prompt_source` field pointing at
-`fixtures/01-prd-precorrection-us01.md` instead of an inline `evidence`
-field, and `lib/prompt-builder.mjs`'s `resolveClaimEvidence` honors it.
+(the corrected PRD). AC-008 is the exception: its `evidence` is the
+historical pre-correction US-01 text, and its `evidence_source` field
+records the file that text was taken from,
+`fixtures/01-prd-precorrection-us01.md`. That field is **provenance only** —
+nothing reads it at run time (see "No runtime file reads" below); a test
+pins the inline evidence byte-for-byte against the file it names, so the
+pointer cannot drift from the text it documents.
 The reason is structural, not incidental — `fixtures/01-prd.md` as
 committed already contains the corrected, post-jury US-01 wording (the
 contradiction resolved), so a judge reading it can legitimately answer
@@ -154,6 +160,25 @@ documents exactly what is verbatim-quoted from git (two fragments, in
 `10-verification-report.md:24` and `01-prd.md:53`) versus reconstructed
 from those fragments — no git commit holds the full historical wording,
 so this is disclosed rather than presented as a recovered blob.
+
+## No runtime file reads
+
+Everything this harness sends leaves the machine for a third-party LLM
+endpoint, so **nothing in the prompt→network path opens a file at run
+time.** The corpus is bound by a static
+`import ... with { type: "json" }` of `fixtures/ground-truth.json`, and
+`judge.mjs` takes its prompt from stdin.
+
+This is a deliberate structural property, not a style choice. Both inputs
+were previously paths chosen at run time — `prompt_source` named a file in
+the claim DATA, and `--prompt-file` named one on the command line — which
+made the corpus substitutable: point either at another file and its
+contents are posted to a third-party API. Containment checks can guard such
+a read (and did, for `prompt_source`); removing the read removes the class.
+CodeQL `js/file-access-to-http` reported exactly this flow and now reports
+nothing. Three tests pin it: no `node:fs` import or `readFileSync` call in
+any module on the path, the static-import binding in `calibrate.mjs`, and
+the AC-008 provenance equality above.
 
 ## Data-privacy note
 

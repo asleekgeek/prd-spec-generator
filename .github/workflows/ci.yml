@@ -114,6 +114,19 @@ jobs:
         # class (issue #29 criterion 4).
         run: pnpm test
 
+      - name: Test (external-judge harness)
+        # scripts/external-judge runs on node:test, not vitest, so `pnpm test`
+        # never touched it — the script existed in package.json and no
+        # workflow called it, which is the same "structurally broken, invisible
+        # because CI never ran it" shape as the lint script in PR #21.
+        #
+        # It earns its place on the matrix rather than a single leg: the
+        # harness binds its corpus with `import … with { type: "json" }`, whose
+        # support is node-version-dependent (>=20.10), so running it on both
+        # 20.x and 22.x is precisely the gate. No network — every test is
+        # offline (the no-credentials path returns "skipped").
+        run: pnpm run test:external-judge
+
   dependency-review:
     name: dependency review (PR)
     runs-on: ubuntu-latest

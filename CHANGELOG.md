@@ -29,6 +29,20 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **The external-judge harness no longer reads any file on the path to the
+  network** (`js/file-access-to-http`, the last CodeQL alert open on `main`).
+  Both inputs used to be paths chosen at run time — `prompt_source` named a
+  file inside the claim *data*, and `judge.mjs --prompt-file` named one on the
+  command line — so the corpus was substitutable: point either at another file
+  and its bytes are posted to a third-party LLM API. #37 guarded the first with
+  a traversal check; this removes both reads instead. The corpus is now bound
+  by a static `import … with { type: "json" }`, AC-008's historical text is
+  inline in the fixture (its file recorded in `evidence_source` as provenance,
+  pinned byte-for-byte by a test), and `judge.mjs` reads stdin — `< prompt.txt`
+  is the same invocation with the shell doing the open. Verified with the
+  CodeQL CLI against the query's own model: 1 result before, 0 after, and 0 new
+  alerts across the full `security-and-quality` suite.
+
 - **Three polynomial-ReDoS patterns closed** in the hard-output rules
   (`js/polynomial-redos`, the two CodeQL alerts that survived #37). All three
   were reported at the shared `findPatternViolations` call site but lived in the
@@ -44,6 +58,20 @@ adheres to [Semantic Versioning](https://semver.org/).
   rejected on call (`RegisteredTool.disable()` → `-32602 "Tool … disabled"`).
   Hiding from the list while still executing would be a hole, not an
   optimization. Asserted by `packages/mcp-server/src/__tests__/mcp-prompts.test.ts`.
+
+### Removed
+
+- **`judge.mjs --prompt-file`** — prompt text now comes from stdin only.
+  `node judge.mjs … < prompt.txt` is byte-for-byte the same invocation with the
+  shell performing the open, so no capability is lost; what goes is a second
+  way to do one thing that happened to be the exfiltration primitive above. No
+  caller in the repo used the flag.
+
+- **`prompt_source` in `fixtures/ground-truth.json`**, replaced by the inline
+  `evidence` field every other claim already used, plus an `evidence_source`
+  provenance pointer that nothing reads. `resolveClaimEvidence` therefore no
+  longer touches the filesystem, and the `resolveInsideFixtures` containment
+  helper added in #37 is gone with the read it guarded.
 
 ### Changed
 
