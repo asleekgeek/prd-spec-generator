@@ -200,7 +200,7 @@ export function makeProductionDispatcher(
       default: {
         const _exhaustive: never = action;
         throw new Error(
-          `productionDispatcher: unhandled action.kind=${(action as NextAction).kind}. ` +
+          `productionDispatcher: unhandled action.kind=${(_exhaustive as NextAction).kind}. ` +
             `Add a case to the dispatch switch.`,
         );
       }

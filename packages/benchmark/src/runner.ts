@@ -1,6 +1,9 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { validateSection, validateDocument } from "@prd-gen/validation";
+// validateDocument runs every section-level rule internally (it calls
+// validateSection per section and merges the reports) before adding the
+// cross-section checks, so the benchmark needs only this one entry point.
+import { validateDocument } from "@prd-gen/validation";
 import { validateCrossReferences } from "@prd-gen/validation";
 import type { SectionType, ValidationReport, CrossRefValidationResult } from "@prd-gen/core";
 

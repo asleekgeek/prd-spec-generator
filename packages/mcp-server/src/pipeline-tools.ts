@@ -22,7 +22,9 @@ import {
   InMemoryRunStore,
   ActionResultSchema,
   type PipelineState,
-  type ActionResult,
+  // ActionResult (the type) is not imported: the tool declares its input via
+  // ActionResultSchema directly (see submit_action_result below), so zod infers
+  // the shape and a separate type import would be a second source of truth.
   type NextAction,
 } from "@prd-gen/orchestration";
 import {

@@ -368,7 +368,7 @@ export function makeCannedDispatcher(
       default: {
         const _exhaustive: never = action;
         throw new Error(
-          `cannedDispatcher: unhandled action.kind=${(action as NextAction).kind}. ` +
+          `cannedDispatcher: unhandled action.kind=${(_exhaustive as NextAction).kind}. ` +
             `Add a case to the dispatch switch.`,
         );
       }
