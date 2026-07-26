@@ -46,6 +46,7 @@ export async function runProductionFromCli(args: CliEntryOptions): Promise<void>
   // is plumbed through the runner. Until then, a CLI invocation produces a
   // PILOT artefact, not a promotable production batch — see runbook
   // §"Pilot vs promotable".
+  const skipFrozenBaselineCheck = hasFlag(args.argv, "skip-frozen-baseline-check");
   const useStub = !hasFlag(args.argv, "real-host");
   const agentInvoker = useStub
     ? makeStubAgentInvoker({ rng: mulberry32ForCli(PRE_REGISTERED_SEED_45_PRODUCTION) })
@@ -64,6 +65,7 @@ export async function runProductionFromCli(args: CliEntryOptions): Promise<void>
     featureDescription: "build a feature for OAuth login",
     codebasePath: "/tmp/benchmark-production",
     inMemoryOnly: false,
+    skipFrozenBaselineCheck,
     agentInvoker,
     agentInvokerClass: useStub ? "stub-deterministic-cli" : "host-real",
   });

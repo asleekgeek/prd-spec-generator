@@ -23,7 +23,7 @@
  * `KPI_GATES` from `../src/`. No imports from `dist/`.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { measurePipelineAsync } from "../src/pipeline-kpis-async.js";
 import { KPI_GATES, type PipelineKpis } from "../src/pipeline-kpis.js";
@@ -257,6 +257,60 @@ function buildCalibrationEntries(args: BuildEntriesInput): {
   return { entries, xmrFiles };
 }
 
+// ─── Frozen-baseline pre-flight ─────────────────────────────────────────────
+
+/**
+ * Compare the current `pipeline-kpis.ts` content hash against the hash
+ * recorded in a pre-existing PRODUCTION artefact. Abort on sealed mismatch.
+ *
+ * Counterpart of `calibrate-gates.ts:preflightFrozenBaselineCheck`, which
+ * guards the canned series' `gate-calibration-K100.json`. The production
+ * runner computed `frozen_baseline_content_hash` and re-stamped it on every
+ * run without ever reading the recorded value back, so a `pipeline-kpis.ts`
+ * edit between two production K-batches was silently absorbed — the AP-1
+ * ratchet had no production counterpart.
+ *
+ * Precondition:  none. A missing, unreadable, or gate-less artefact means
+ *   "no baseline sealed yet" and passes.
+ * Postcondition: returns the current hash, or throws when a SEALED artefact
+ *   (`gates.length > 0`) records a different hash.
+ *
+ * source: docs/PHASE_4_PLAN.md §4.5 frozen-baseline + Popper AP-1 protection.
+ */
+function preflightFrozenBaselineCheck(
+  outputDir: string,
+  skipCheck: boolean,
+): string {
+  const currentHash = computePipelineKpisContentHash();
+  if (skipCheck) return currentHash;
+  const existingPath = join(outputDir, PRODUCTION_OUTPUT_BASENAME);
+  if (!existsSync(existingPath)) return currentHash;
+  let existing: { gates?: unknown[]; frozen_baseline_content_hash?: string };
+  try {
+    existing = JSON.parse(readFileSync(existingPath, "utf8")) as typeof existing;
+  } catch {
+    return currentHash;
+  }
+  if (
+    existing.gates &&
+    existing.gates.length > 0 &&
+    existing.frozen_baseline_content_hash &&
+    existing.frozen_baseline_content_hash !== currentHash
+  ) {
+    throw new Error(
+      `frozen-baseline content hash mismatch (production series):\n` +
+        `  recorded:  ${existing.frozen_baseline_content_hash}\n` +
+        `  current:   ${currentHash}\n` +
+        `Per docs/PHASE_4_PLAN.md §4.5 (Popper AP-1 ratchet protection): ` +
+        `re-run requires committing to a frozen baseline. Either revert ` +
+        `pipeline-kpis.ts to the recorded hash or accept that calibration ` +
+        `must be re-done from scratch (delete ${PRODUCTION_OUTPUT_BASENAME} ` +
+        `and re-run with --skip-frozen-baseline-check on the first new run).`,
+    );
+  }
+  return currentHash;
+}
+
 // ─── Production artefact envelope ───────────────────────────────────────────
 
 /**
@@ -283,6 +337,13 @@ export interface ProductionRunnerOptions {
   readonly featureDescription: string;
   readonly codebasePath: string;
   readonly inMemoryOnly: boolean;
+  /**
+   * Skip the frozen-baseline drift pre-flight (`--skip-frozen-baseline-check`).
+   * Optional and additive: omitting it RUNS the check, so every pre-existing
+   * caller gains the protection without a signature change. Set it only on
+   * the first run of a deliberately re-based calibration series.
+   */
+  readonly skipFrozenBaselineCheck?: boolean;
   /**
    * Required: the agent invoker. Tests pass a deterministic stub; production
    * passes a real subagent-backed invoker.
@@ -375,7 +436,10 @@ async function assembleGateCalibration(
   nowIso: string,
   headCommit: string,
 ): Promise<{ gateCalibration: ProductionGateCalibration; xmrFiles: ReadonlyArray<XmrFile> }> {
-  const currentHash = computePipelineKpisContentHash();
+  const currentHash = preflightFrozenBaselineCheck(
+    options.outputDir,
+    options.skipFrozenBaselineCheck ?? false,
+  );
   const kpis = await driveProductionRuns({
     k: options.k,
     seed: PRE_REGISTERED_SEED_45_PRODUCTION,
