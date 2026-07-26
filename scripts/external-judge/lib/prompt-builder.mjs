@@ -29,10 +29,39 @@
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve, relative, isAbsolute } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FIXTURES_DIR = join(__dirname, "..", "fixtures");
+const FIXTURES_DIR = resolve(join(__dirname, "..", "fixtures"));
+
+/**
+ * Resolve `name` under FIXTURES_DIR, refusing anything that escapes it.
+ *
+ * `join(FIXTURES_DIR, name)` alone is not containment: `join` normalises
+ * `..` segments away, so a `prompt_source` of `../../../.env` resolves to a
+ * real path outside fixtures/ and reads clean. That matters more here than in
+ * an ordinary file read — everything this module returns is posted to a
+ * third-party LLM endpoint (js/file-access-to-http), so an escaping path is
+ * an exfiltration primitive, and the claim file it comes from is data, which
+ * §13 D2 says to treat as untrusted at the boundary regardless of who wrote it.
+ *
+ * `relative()` is the check rather than a `startsWith` on the string: a
+ * sibling directory like `fixtures-scratch/` has `fixtures` as a string
+ * prefix but is not inside it.
+ *
+ * @param {string} name filename relative to fixtures/
+ * @returns {string} absolute path, guaranteed inside FIXTURES_DIR
+ */
+function resolveInsideFixtures(name) {
+  const candidate = resolve(FIXTURES_DIR, name);
+  const rel = relative(FIXTURES_DIR, candidate);
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+    throw new Error(
+      `resolveClaimEvidence: prompt_source "${name}" escapes the fixtures directory`,
+    );
+  }
+  return candidate;
+}
 
 /**
  * Resolve the evidence text for a claim: honors `claim.prompt_source` (a
@@ -44,15 +73,16 @@ const FIXTURES_DIR = join(__dirname, "..", "fixtures");
  * present — see fixtures/ground-truth.json's AC-008 entry, the only claim
  * that currently sets it).
  * Postcondition: returns a non-empty evidence string; throws (never
- * returns undefined/empty) if the claim has neither field, or if
- * prompt_source names a file that does not exist under fixtures/.
+ * returns undefined/empty) if the claim has neither field, if prompt_source
+ * names a file that does not exist under fixtures/, or if prompt_source
+ * resolves outside fixtures/ (see resolveInsideFixtures).
  *
  * @param {{claim_id: string, evidence?: string, prompt_source?: string}} claim
  * @returns {string}
  */
 export function resolveClaimEvidence(claim) {
   if (claim.prompt_source) {
-    return readFileSync(join(FIXTURES_DIR, claim.prompt_source), "utf8");
+    return readFileSync(resolveInsideFixtures(claim.prompt_source), "utf8");
   }
   if (typeof claim.evidence === "string" && claim.evidence.length > 0) {
     return claim.evidence;
