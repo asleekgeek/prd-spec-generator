@@ -36,12 +36,25 @@ SERVER_DIR="${ROOT}/mcp-server"
 # native build is unavailable on the host.
 if [[ ! -d "${SERVER_DIR}/node_modules/ajv" ]]; then
   echo "prd-gen: first launch — installing MCP server runtime deps…" >&2
-  # --no-package-lock: the workspace pins versions via pnpm-lock.yaml; this is a
-  # runtime provisioning step into an ephemeral install dir, so we don't litter
-  # it with a second (npm) lockfile.
-  npm install \
+  # `npm ci` against the COMMITTED mcp-server/package-lock.json, not
+  # `npm install`. This step runs on the user's machine at first launch, so
+  # `npm install` re-resolved the tree there: whatever `^8.17.1` meant on that
+  # day is what shipped, with no integrity check. `npm ci` installs the exact
+  # locked tree and verifies every `integrity` hash in the lockfile (44 of its
+  # 45 entries carry one; the root project entry has no tarball).
+  #
+  # The lockfile is committed for the same reason the bundle is: `claude plugin
+  # install` clones repository files and runs no install step, so anything not
+  # in the repo does not exist at launch.
+  #
+  # source: Scorecard PinnedDependenciesID (issue #36). Its shell checker
+  # accepts exactly one npm form — checks/raw/shell_download_validate.go
+  # `isNpmUnpinnedDownload` treats a command as pinned only when it contains
+  # `ci`. Pinning versions inside `npm install pkg@1.2.3` does NOT satisfy it,
+  # and would not verify hashes either.
+  npm ci \
     --prefix "${SERVER_DIR}" \
-    --omit=dev --no-audit --no-fund --no-package-lock --loglevel=error >&2
+    --omit=dev --no-audit --no-fund --loglevel=error >&2
 fi
 
 exec node "${SERVER_DIR}/index.js"

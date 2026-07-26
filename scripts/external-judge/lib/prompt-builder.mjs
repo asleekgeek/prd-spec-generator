@@ -79,7 +79,7 @@ const RESPONSE_SCHEMA = `
 `.trim();
 
 /**
- * @param {{claim_id: string, claim_type: string, text: string, evidence?: string, prompt_source?: string}} claim
+ * @param {{claim_id: string, claim_type: string, text: string, evidence?: string, evidence_source?: string}} claim
  * @returns {string}
  */
 export function buildClaimPrompt(claim) {
