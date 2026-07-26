@@ -64,7 +64,21 @@ export function checkTestTraceabilityIntegrity(
     /fn\s+(test\w+)\s*\(/g,
     // Bash implicit-function form: test_xxx() { ... } / test_xxx () { ... }
     // (optional space before both the parens and the opening brace)
-    /(test\w+)\s*\(\s*\)\s*\{/g,
+    //
+    // `\b` is load-bearing, not decoration. This is the only pattern here with
+    // no keyword prefix to anchor it, so without a boundary the engine restarts
+    // at every embedded "test" and re-scans the identifier run from each one.
+    // Measured on `"test".repeat(n)`: 2000 → 8.0 ms, 4000 → 30.8 ms,
+    // 8000 → 122.4 ms, 16000 → 488.2 ms — quadratic (js/polynomial-redos).
+    // A boundary cannot occur inside a run of word characters, so the restarts
+    // collapse: flat at ≤0.1 ms across the same range.
+    //
+    // It also tightens the rule. `mytest_foo() {` used to register `test_foo`
+    // as defined, so a matrix row naming `test_foo` passed traceability against
+    // a function that is not it. Differential check over 65,290 lines of this
+    // repo found 0 names that only the old form matched, so nothing real is
+    // lost by requiring the boundary.
+    /\b(test\w+)\s*\(\s*\)\s*\{/g,
     // Bash explicit "function" form without parens: function test_xxx { ... }
     /function\s+(test\w+)\s*\{/g,
   ];
