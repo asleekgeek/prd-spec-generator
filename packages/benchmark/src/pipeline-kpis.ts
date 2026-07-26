@@ -354,7 +354,8 @@ export const KPI_GATES = {
    * source: provisional heuristic. Smoke baseline = 62 iterations on
    * trial+codebase; cap is 100 (~60% headroom). dijkstra cross-audit derived
    * a structural max of 9 emit_message hops; the substantive-action count
-   * builds on that. Phase 4.5 will replace with measured P95 + 1σ.
+   * builds on that. Replace with measured P95 + 1σ once the calibrated
+   * baseline has enough runs.
    */
   iteration_count_max: 100,
   /**
@@ -362,7 +363,8 @@ export const KPI_GATES = {
    * with 100× margin to cover CI startup + locale variance. The previous
    * 5000ms value mistook 5ms × 1000 = 5000 (not 5ms × 10 = 50). The 500ms
    * gate retains 100× headroom while still failing on a 100× regression.
-   * Phase 4.5 will replace with measured P95 per machine class.
+   * Replace with measured P95 per machine class once the calibrated
+   * baseline has enough runs.
    */
   wall_time_ms_max: 500,
   /**
