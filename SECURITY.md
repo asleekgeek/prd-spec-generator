@@ -86,6 +86,21 @@ this team size, while the approval count honestly reports zero rather than
 laundering a self-approval into a green metric. This is revisited the moment a
 second maintainer joins.
 
+**`CIIBestPracticesID` is declined for the same structural reason.** The project
+IS registered — [bestpractices.dev/projects/13832](https://www.bestpractices.dev/projects/13832),
+badge shown in the README — and registering it moved the check from 0 to 2.
+Closing the finding outright takes more than that: Scorecard's
+`checks/evaluation/cii_best_practices.go` awards its maximum only for the
+**gold** badge (silver 7, passing 5, in progress 2) and reports a finding at any
+score below maximum. Gold requires the `contributors_unassociated` criterion —
+at least two significant contributors not associated with each other — which is
+the same wall as `CodeReviewID`, and not one a single-maintainer project clears
+by doing better engineering.
+
+Completing the questionnaire to **passing** is worthwhile on its own merits and
+is ordinary maintenance from here; it raises the score to 5 without closing the
+alert.
+
 ## Reporting a Vulnerability
 
 If you discover a security issue in this project, **do not** open a public
