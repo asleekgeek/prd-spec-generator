@@ -69,6 +69,15 @@ jobs:
               || (echo "::error::mcp-server bundle out of date — run 'pnpm build' and commit"; exit 1)
           fi
 
+      - name: Verify the numbers the docs advertise are still true
+        run: |
+          set -euo pipefail
+          # The test count is quoted in six user-facing places, including the
+          # marketplace descriptions a prospective user reads. It went stale
+          # twice in one working session (877 while the suite was 962, then 962
+          # while it was 1496), so it is checked where it matters: at publish.
+          pnpm check:docs
+
       - name: Assemble .mcpb staging directory
         run: |
           set -euo pipefail
