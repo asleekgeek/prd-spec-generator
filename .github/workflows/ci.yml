@@ -32,6 +32,22 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege for GITHUB_TOKEN across every job in this file (issue #36,
+# Scorecard TokenPermissionsID). Nothing here writes to the repository: the
+# jobs build, test, and read the dependency graph. A job that ever needs more
+# raises it in its own `permissions:` block rather than widening this one.
+#
+# This block is also what drives the check's SCORE. Per Scorecard's
+# checks/evaluation/permissions.go, a job-level write costs points only when
+# its own file declares no top-level permissions (`undeclaredPermissions
+# ["topLevel"]` → score -= 0.5) or the file also holds a top-level write
+# (→ score 0). release.yml already declares `contents: read` at top level, so
+# its job-level `contents: write` — which creating a GitHub Release genuinely
+# requires — is logged as a warning detail and costs nothing. This file having
+# NO top-level block was the finding that zeroed the check.
+permissions:
+  contents: read
+
 jobs:
   build-test:
     name: build + test

@@ -21,18 +21,48 @@ import { describe, expect, it } from "vitest";
 import { validateSection } from "../index.js";
 
 /**
- * Median wall-clock of `run` over `samples` iterations, in milliseconds.
- * Median rather than mean: one descheduled iteration should not move it.
+ * Floor for a single sample, in milliseconds. Below this, two timings are
+ * mostly clock granularity and their quotient carries no information.
  */
-function medianMs(run: () => void, samples = 5): number {
-  const timings: number[] = [];
-  for (let i = 0; i < samples; i++) {
-    const started = performance.now();
-    run();
-    timings.push(performance.now() - started);
+const MIN_SAMPLE_MS = 0.5;
+
+/**
+ * Median of the per-pair growth ratio between `large` and `small`.
+ *
+ * The pair is timed BACK-TO-BACK, and that is the whole point. The previous
+ * implementation timed every `small` sample, then every `large` sample, so any
+ * ambient-load drift between the two blocks landed entirely in the numerator.
+ * With 89 test files running in parallel that drift is routine, and it made
+ * this assertion fail on an UNCHANGED tree: `main` produced ratio 3.42 (ceiling
+ * 2.5) on one full-suite run and passed the next two, with no quadratic pattern
+ * anywhere in the diff. The file header claimed the ratio "holds regardless of
+ * how loaded the machine is"; that is true of the property and was false of the
+ * measurement.
+ *
+ * Timing both sizes adjacently puts them under the same ambient load, so the
+ * load term is common to numerator and denominator and cancels. The median over
+ * pairs then discards any single descheduled pair. Growth in the INPUT is what
+ * survives: a quadratic pattern still lands near 4x in every pair, because that
+ * factor comes from the input doubling and not from the scheduler.
+ *
+ * source: measured pre-fix growth of the three patterns in this repo
+ * (each ~3.9–4.0x per doubling; see the comments at their definitions).
+ */
+function medianGrowthRatio(run: (input: string) => void, small: string, large: string, pairs = 7): number {
+  const ratios: number[] = [];
+  for (let i = 0; i < pairs; i++) {
+    const startedSmall = performance.now();
+    run(small);
+    const elapsedSmall = performance.now() - startedSmall;
+
+    const startedLarge = performance.now();
+    run(large);
+    const elapsedLarge = performance.now() - startedLarge;
+
+    ratios.push(elapsedLarge / Math.max(elapsedSmall, MIN_SAMPLE_MS));
   }
-  timings.sort((a, b) => a - b);
-  return timings[Math.floor(timings.length / 2)];
+  ratios.sort((a, b) => a - b);
+  return ratios[Math.floor(ratios.length / 2)];
 }
 
 /**
@@ -49,13 +79,10 @@ function expectSubQuadratic(build: (n: number) => string, section: Parameters<ty
   const base = 4000;
   const small = build(base);
   const large = build(base * 2);
-  // Warm the JIT so the first sample does not carry compilation cost.
+  // Warm the JIT on BOTH sizes so no first sample carries compilation cost.
   validateSection(small, section);
-  const tSmall = medianMs(() => validateSection(small, section));
-  const tLarge = medianMs(() => validateSection(large, section));
-  // A floor guards against dividing two sub-millisecond timings, where noise
-  // dominates and the ratio is meaningless.
-  const ratio = tLarge / Math.max(tSmall, 0.5);
+  validateSection(large, section);
+  const ratio = medianGrowthRatio((input) => validateSection(input, section), small, large);
   expect(ratio).toBeLessThan(QUADRATIC_GROWTH_CEILING);
 }
 

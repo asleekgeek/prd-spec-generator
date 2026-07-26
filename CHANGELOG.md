@@ -29,6 +29,69 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **Every known-vulnerable dependency is gone, and the audit ignore list is now
+  empty** (#36, Scorecard `VulnerabilitiesID`). The tree carried 39 advisories
+  (1 critical, 12 high) and `pnpm.auditConfig.ignoreGhsas` suppressed 8 of them.
+  Both are now zero: `pnpm audit` reports `{critical:0, high:0, moderate:0,
+  low:0}` with nothing suppressed. Floors come from each advisory's
+  `first_patched_version`, not from guesswork — `vitest` (critical
+  GHSA-5xrq-8626-4rwp, `packages/benchmark` was pinned at `^2.0.0` while the
+  rest of the repo ran `^4`), `vite` 8.1.5, `postcss` 8.5.23, `hono` 4.12.32,
+  `@hono/node-server` 2.0.5, `fast-uri` 3.1.4, `ip-address` 10.3.1, `qs` 6.15.3,
+  `body-parser` 2.3.0, `js-yaml` 4.3.0, `esbuild` 0.28.1, `mathjs` 15.2.0.
+  Transitive floors are pinned via `pnpm.overrides`, each satisfying its
+  declaring parent's own range (`@modelcontextprotocol/sdk` is already at its
+  latest 1.29.0, so there was no upstream release to wait for).
+  The previous deferral said mathjs was "absent from the shipped .mcpb"; that
+  was false — `grep -c mathjs mcp-server/index.js` returns 730 on the bundle it
+  described — so the two-major bump was owed rather than optional.
+
+- **The plugin's runtime provisioning now verifies integrity hashes**
+  (#36, Scorecard `PinnedDependenciesID`). `bin/ensure-deps.sh` ran `npm install
+  --no-package-lock` on the *user's* machine at first launch, so the shipped
+  plugin re-resolved `^8.17.1` to whatever it meant that day, unverified. It now
+  runs `npm ci` against a committed `mcp-server/package-lock.json` (44 of 45
+  entries carry an `integrity` hash). Scorecard's shell checker accepts exactly
+  this one form: `isNpmUnpinnedDownload` treats a command as pinned only when it
+  contains `ci`, so pinning versions inside `npm install pkg@1.2.3` satisfies
+  neither the checker nor the actual threat.
+
+- **Least-privilege `GITHUB_TOKEN` across CI** (#36, Scorecard
+  `TokenPermissionsID`): `ci.yml` declared no top-level `permissions:` block.
+  Per Scorecard's own `checks/evaluation/permissions.go`, that undeclared
+  top-level is what zeroed the check; `release.yml`'s job-level `contents:
+  write` — which creating a GitHub Release genuinely requires — costs nothing
+  because that file already declares `contents: read` at top level.
+
+### Added
+
+- **Property-based tests for `validateSection`** (#36, Scorecard `FuzzingID`):
+  six contract invariants under `fast-check` — never throws, score stays in
+  [0,1], `rulesPassed`/violations partition `rulesChecked`,
+  `hasCriticalViolations` agrees with the violation set, determinism, and
+  section-type echo. The function is fed LLM output, so its input space is "any
+  string a model might emit"; the two defects `regex-hardening.test.ts` records
+  (`[:<≤<=]` never matching `<=`, and `test_foo` matching inside `mytest_foo`)
+  were both reachable by ordinary inputs nobody had written down.
+
+- **Dependabot** (#36, Scorecard `DependencyUpdateToolID`) for `npm` and
+  `github-actions`. The second ecosystem matters as much as the first: every
+  `uses:` is pinned by commit SHA, and a SHA pin never ages out on its own, so
+  without it the repo trades a supply-chain risk for an unpatched-action risk.
+
+### Fixed
+
+- **The ReDoS growth-ratio assertion no longer fails on an unchanged tree.**
+  `expectSubQuadratic` timed every `small` sample and then every `large` one, so
+  ambient-load drift between the two blocks landed entirely in the numerator —
+  on a 90-file parallel suite that is routine, and `main` produced ratio 3.42
+  against a 2.5 ceiling on one run while passing the next two. The pair is now
+  timed back-to-back and the median is taken over per-pair ratios, so the load
+  term is common to numerator and denominator and cancels. The assertion keeps
+  its 2.5 ceiling and its power: measured against an injected O(n²) worker it
+  still reports 4.00 idle and 3.81 under eight competing CPU spinners, versus
+  0.03/0.05 for a linear one.
+
 - **The external-judge harness no longer reads any file on the path to the
   network** (`js/file-access-to-http`, the last CodeQL alert open on `main`).
   Both inputs used to be paths chosen at run time — `prompt_source` named a
