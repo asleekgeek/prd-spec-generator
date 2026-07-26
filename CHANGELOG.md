@@ -81,6 +81,30 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The `.mcpb` bundle could not start.** `manifest.json` declares
+  `server.mcp_config` = `node ${__dirname}/mcp-server/index.js`, and the staged
+  tree carried no `node_modules`: launching it exited immediately with
+  `Cannot find module 'ajv'`. `bin/ensure-deps.sh` shipped inside the bundle but
+  nothing in the `.mcpb` ever invoked it — that launcher belongs to the *plugin*
+  path (`.mcp.json`), which passes it explicitly. The `.mcpb` now ships with its
+  runtime dependencies already provisioned from the committed lockfile
+  (`--omit=optional` leaves out the platform-specific `better-sqlite3`, whose
+  absence is the already-declared Beta(7,3) prior fallback).
+
+  The reason this survived a green suite is that the suite exercises the
+  workspace *sources*; nothing ever started the artifact users install. So
+  staging moved out of `release.yml` into `scripts/release/stage-mcpb.sh`, and
+  `scripts/release/smoke-mcpb.sh` stages the bundle and speaks MCP to it over
+  stdio, asserting `initialize` returns a `serverInfo` and `tools/list` returns
+  17 tools. It runs as the `mcpb smoke` CI job on every push **and** as a gate
+  in `release.yml` before packing. Verified to fail on the defect it exists to
+  catch: with provisioning removed it reports `SMOKE FAIL: no response to
+  initialize — the server did not start`.
+
+  Both channels are now verified end-to-end from a clean tree: the plugin path
+  (`ensure-deps.sh` → `npm ci` → 44 packages) and the `.mcpb` path both reach
+  `initialize OK → prd-gen 0.4.0, 17 tools`.
+
 - **The ReDoS growth-ratio assertion no longer fails on an unchanged tree.**
   `expectSubQuadratic` timed every `small` sample and then every `large` one, so
   ambient-load drift between the two blocks landed entirely in the numerator —

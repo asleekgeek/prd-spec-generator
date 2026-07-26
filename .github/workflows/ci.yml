@@ -143,6 +143,50 @@ jobs:
         # offline (the no-credentials path returns "skipped").
         run: pnpm run test:external-judge
 
+  mcpb-smoke:
+    name: mcpb smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The distributable, actually started. `build + test` exercises the
+    # workspace SOURCES; it says nothing about the artifact users install. That
+    # gap shipped a .mcpb whose own declared command — `node
+    # ${__dirname}/mcp-server/index.js` per manifest.json — exited on
+    # `Cannot find module 'ajv'`, because the staged tree carried no
+    # node_modules and nothing in the bundle invoked bin/ensure-deps.sh.
+    # This job stages the bundle exactly as release.yml does (same script) and
+    # speaks MCP to it over stdio.
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          # source: package.json declares pnpm v10 in pnpm-lock.yaml metadata.
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # The floor the package declares, so the artifact is proven on the
+          # oldest runtime it claims to support.
+          node-version: 20.x
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and bundle
+        run: pnpm build && pnpm bundle
+
+      - name: Stage and start the .mcpb
+        # Asserts initialize returns serverInfo AND tools/list returns the
+        # expected count. "the file exists" would have passed while the server
+        # was unstartable.
+        run: bash scripts/release/smoke-mcpb.sh
+
   dependency-review:
     name: dependency review (PR)
     runs-on: ubuntu-latest
