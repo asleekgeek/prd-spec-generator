@@ -171,3 +171,42 @@ test("summarize: a judge that always PASSes gets high agreement but does NOT cat
   // ...which is exactly why AC-008 is checked as a SEPARATE, mandatory admission condition (see calibrate.mjs header).
   assert.equal(summaryObj.ac008Caught, false);
 });
+
+// ── prompt_source containment (js/file-access-to-http) ───────────────────────
+// `resolveClaimEvidence` reads a file named by DATA and the result is posted to
+// a third-party LLM endpoint, so a `prompt_source` that escapes fixtures/ is an
+// exfiltration primitive, not just a bad path. These pin the boundary check.
+
+test("resolveClaimEvidence: reads a file inside fixtures/", () => {
+  const text = resolveClaimEvidence({ claim_id: "T-1", prompt_source: "01-prd.md" });
+  assert.equal(typeof text, "string");
+  assert.ok(text.length > 0);
+});
+
+test("resolveClaimEvidence: refuses a traversing prompt_source", () => {
+  for (const escape of [
+    "../../../package.json",
+    "../../package.json",
+    "subdir/../../../package.json",
+  ]) {
+    assert.throws(
+      () => resolveClaimEvidence({ claim_id: "T-2", prompt_source: escape }),
+      /escapes the fixtures directory/,
+      `expected "${escape}" to be refused`,
+    );
+  }
+});
+
+test("resolveClaimEvidence: refuses an absolute prompt_source", () => {
+  assert.throws(
+    () => resolveClaimEvidence({ claim_id: "T-3", prompt_source: "/etc/hosts" }),
+    /escapes the fixtures directory/,
+  );
+});
+
+test("resolveClaimEvidence: refuses fixtures/ itself", () => {
+  assert.throws(
+    () => resolveClaimEvidence({ claim_id: "T-4", prompt_source: "." }),
+    /escapes the fixtures directory/,
+  );
+});

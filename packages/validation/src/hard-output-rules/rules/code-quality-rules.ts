@@ -14,8 +14,18 @@ export function checkNoNestedTypes(
   const codeBlocks = extractCodeBlocks(content);
   if (codeBlocks.length === 0) return [];
 
+  // `^`, not `(?:^|\n)`: this is tested against ONE line at a time (the
+  // `codeBlock.split("\n")` below), so a `\n` can never appear in the subject
+  // and the `\n` alternative is unreachable. It was not free, though — it let
+  // the engine start a match after every newline while `\s*` ALSO matches
+  // newlines, so a run of blank lines could be split between the two in n
+  // ways, once per start position. Measured on `"\n".repeat(n)`: 2000 → 2.9 ms,
+  // 4000 → 10.1 ms, 8000 → 39.8 ms, 16000 → 157.9 ms — quadratic
+  // (js/polynomial-redos). With `^` there is one start position: flat at
+  // ≤0.1 ms across the same range. Equivalence checked differentially over
+  // 65,290 lines of this repo's .ts/.md/.mjs/.swift/.sh: 0 divergences.
   const typeKeywordPattern =
-    /(?:^|\n)\s*(?:public\s+|private\s+|internal\s+|protected\s+|open\s+|fileprivate\s+|final\s+|abstract\s+|sealed\s+|data\s+)*(?:struct|class|enum|interface|object|record)\s+\w+/;
+    /^\s*(?:public\s+|private\s+|internal\s+|protected\s+|open\s+|fileprivate\s+|final\s+|abstract\s+|sealed\s+|data\s+)*(?:struct|class|enum|interface|object|record)\s+\w+/;
 
   const violations: HardOutputRuleViolation[] = [];
 
@@ -78,8 +88,17 @@ export function checkSingleResponsibility(
   }
 
   const codeBlocks = extractCodeBlocks(content);
-  const typeStartPattern =
-    /(?:public\s+|private\s+|internal\s+|protected\s+|open\s+|final\s+|abstract\s+|sealed\s+|data\s+)*(?:struct|class|enum|interface|object)\s+(\w+)/;
+  // The modifier prefix that used to sit here was INERT: it is `*`-quantified
+  // and the pattern is unanchored, so it constrained nothing — the match could
+  // always start at the type keyword instead, capturing the same group 1. It
+  // did cost, though: on a line of modifiers with no type keyword the engine
+  // consumed the whole run once per start position. Measured on
+  // `"abstract ".repeat(n)`: 2000 → 18.2 ms, 4000 → 71.6 ms, 8000 → 287.8 ms,
+  // 16000 → 1141.5 ms — quadratic (js/polynomial-redos). Without it: flat at
+  // ≤0.2 ms across the same range. Equivalence checked differentially over
+  // 65,290 lines of this repo's .ts/.md/.mjs/.swift/.sh: 0 divergences in the
+  // captured type name.
+  const typeStartPattern = /(?:struct|class|enum|interface|object)\s+(\w+)/;
 
   for (const codeBlock of codeBlocks) {
     const lines = codeBlock.split("\n");

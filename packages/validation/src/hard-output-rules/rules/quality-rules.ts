@@ -107,8 +107,16 @@ export function checkHonestVerificationVerdicts(
   content: string,
   sectionType: SectionType,
 ): HardOutputRuleViolation[] {
+  // The old class was `[:<≤<=]`, which CodeQL flagged for the repeated `<`
+  // (js/regex/duplicate-in-character-class). The duplicate was the fossil of a
+  // real bug, not a typo to dedupe: a character class is a SET of single
+  // characters, so writing `<=` inside one asks for `<` (again) and `=`, never
+  // the two-character operator. `p95 <= 200` — the ordinary way to write a
+  // latency NFR — therefore never matched, and this whole rule silently
+  // stopped applying to the documents that need it most. Spelling the operator
+  // as an alternation matches what was meant: `:`, `≤`, `=`, `<`, and `<=`.
   const nfrPattern =
-    /NFR-\d+|(?:p95|p99|latency|throughput|response\s+time)\s*[:<≤<=]\s*\d+/gi;
+    /NFR-\d+|(?:p95|p99|latency|throughput|response\s+time)\s*(?:[:≤=]|<=?)\s*\d+/gi;
   if (!nfrPattern.test(content)) return [];
 
   const verdictPattern =
