@@ -72,32 +72,22 @@ jobs:
       - name: Assemble .mcpb staging directory
         run: |
           set -euo pipefail
+          # Shared with the `mcpb smoke` job in ci.yml, deliberately. This step
+          # used to inline the staging, so the tree that ships was assembled
+          # only during a tag release and never started — which is how a .mcpb
+          # whose declared command dies on `Cannot find module 'ajv'` reached
+          # users past a green suite.
           STAGE_DIR="$(mktemp -d)/prd-spec-generator-mcpb"
-          mkdir -p "${STAGE_DIR}/mcp-server"
-          mkdir -p "${STAGE_DIR}/packages/skill"
-          mkdir -p "${STAGE_DIR}/bin"
-
-          # Core runtime files
-          cp manifest.json "${STAGE_DIR}/"
-          cp icon.png "${STAGE_DIR}/" 2>/dev/null || true
-          cp README.md "${STAGE_DIR}/"
-          cp LICENSE "${STAGE_DIR}/"
-          cp PRIVACY.md "${STAGE_DIR}/"
-
-          # Bundled server
-          cp mcp-server/index.js "${STAGE_DIR}/mcp-server/"
-          cp mcp-server/package.json "${STAGE_DIR}/mcp-server/"
-
-          # Runtime dep provisioner
-          cp bin/ensure-deps.sh "${STAGE_DIR}/bin/"
-          chmod +x "${STAGE_DIR}/bin/ensure-deps.sh"
-
-          # Skill config (required at runtime — PRD_GEN_SKILL_CONFIG)
-          cp packages/skill/skill-config.json "${STAGE_DIR}/packages/skill/"
-
+          bash scripts/release/stage-mcpb.sh "${STAGE_DIR}"
           echo "STAGE_DIR=${STAGE_DIR}" >> "$GITHUB_ENV"
-          echo "Staged contents:"
-          find "${STAGE_DIR}" -type f
+
+      - name: Smoke-test the staged bundle before packing it
+        run: |
+          set -euo pipefail
+          # Speaks MCP to the staged tree using the command manifest.json
+          # declares. A release stops here rather than shipping a server that
+          # cannot start.
+          bash scripts/release/smoke-mcpb.sh
 
       - name: Pack .mcpb bundle
         run: |
