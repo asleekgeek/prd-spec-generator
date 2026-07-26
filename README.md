@@ -534,6 +534,13 @@ packages/
 
 MIT — see [LICENSE](LICENSE).
 
+**Project documents:** [CONTRIBUTING](CONTRIBUTING.md) (how to propose a change,
+and the testing policy) · [GOVERNANCE](GOVERNANCE.md) (who decides, and what
+happens to the project if the maintainer stops) · [SECURITY](SECURITY.md) (how
+to report a vulnerability, and the supply-chain guarantees) ·
+[Assurance case](docs/ASSURANCE-CASE.md) (the security argument and where it
+stops) · [CODE OF CONDUCT](CODE_OF_CONDUCT.md) · [CHANGELOG](CHANGELOG.md).
+
 This software is the independent work of Clément Deust. It was developed
 outside any employment relationship and is not affiliated with, endorsed by,
 or owned by any past or present employer. It is part of the ai-architect
