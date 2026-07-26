@@ -72,7 +72,11 @@ export type ClaimType = z.infer<typeof ClaimTypeSchema>;
 
 /** source: oracle-types.ts SchemaPayload. */
 export const SchemaPayloadSchema = z.object({
-  schema: z.record(z.unknown()),
+  // zod 4 requires the key schema explicitly; `z.record(value)` was a zod-3
+  // shorthand that defaulted the key to `string`. Same runtime shape, and this
+  // form was already the convention everywhere else in the repo (the other 13
+  // `z.record` call sites all pass both arguments).
+  schema: z.record(z.string(), z.unknown()),
   instance: z.unknown(),
   expected_valid: z.boolean(),
 });
