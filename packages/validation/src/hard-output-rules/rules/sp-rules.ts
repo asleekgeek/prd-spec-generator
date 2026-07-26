@@ -62,6 +62,33 @@ export function checkUnevenSPDistribution(
   return [];
 }
 
+/**
+ * Every run of digits in a table cell.
+ *
+ * Module scope is safe ONLY because the sole consumer is `matchAll`, which
+ * per spec clones the regex before iterating and so never advances this
+ * object's `lastIndex`. The row-matching patterns below are deliberately NOT
+ * hoisted: they are driven by `.exec` in a loop, which does mutate
+ * `lastIndex`, so each call must get a fresh object.
+ */
+const NUMBER_PATTERN = /(\d+)/g;
+
+/**
+ * The SP value a table row contributes = the LAST number in its cell text
+ * (earlier numbers are sprint indices, dates, or ID fragments; the estimate
+ * is conventionally the rightmost numeric column).
+ *
+ * Precondition: `cellsText` is the captured cell run of one table row.
+ * Postcondition: returns that trailing number, or null when the row carries
+ *   no digits at all (caller skips such rows).
+ */
+function trailingNumberIn(cellsText: string): number | null {
+  const numbers = [...cellsText.matchAll(NUMBER_PATTERN)].map((m) =>
+    parseInt(m[1], 10),
+  );
+  return numbers.length > 0 ? numbers[numbers.length - 1] : null;
+}
+
 // Rule 1: SP Arithmetic
 export function checkSPArithmetic(
   content: string,
@@ -69,7 +96,6 @@ export function checkSPArithmetic(
 ): HardOutputRuleViolation[] {
   const totalRowPattern =
     /^\s*\|\s*(?:\*{0,2})(?:Total|Sum|Grand\s+Total)(?:\*{0,2})\s*\|(.+)\|/gim;
-  const numberPattern = /(\d+)/g;
   const dataRowPattern =
     /^\s*\|\s*(?!\s*(?:-|(?:\*{0,2})(?:Total|Sum|Grand\s+Total)))([^|]+)\|(.+)\|/gim;
 
@@ -77,15 +103,9 @@ export function checkSPArithmetic(
   const individualSPs: number[] = [];
   let dataMatch: RegExpExecArray | null;
   while ((dataMatch = dataRowPattern.exec(content)) !== null) {
-    const cellsText = dataMatch[2];
-    const numbers: number[] = [];
-    let numMatch: RegExpExecArray | null;
-    const numRegex = /(\d+)/g;
-    while ((numMatch = numRegex.exec(cellsText)) !== null) {
-      numbers.push(parseInt(numMatch[1], 10));
-    }
-    if (numbers.length > 0) {
-      individualSPs.push(numbers[numbers.length - 1]);
+    const rowSP = trailingNumberIn(dataMatch[2]);
+    if (rowSP !== null) {
+      individualSPs.push(rowSP);
     }
   }
 
@@ -93,16 +113,9 @@ export function checkSPArithmetic(
   const violations: HardOutputRuleViolation[] = [];
   let totalMatch: RegExpExecArray | null;
   while ((totalMatch = totalRowPattern.exec(content)) !== null) {
-    const cellsText = totalMatch[1];
-    const numbers: number[] = [];
-    let numMatch: RegExpExecArray | null;
-    const numRegex = /(\d+)/g;
-    while ((numMatch = numRegex.exec(cellsText)) !== null) {
-      numbers.push(parseInt(numMatch[1], 10));
-    }
-    if (numbers.length === 0) continue;
+    const totalValue = trailingNumberIn(totalMatch[1]);
+    if (totalValue === null) continue;
 
-    const totalValue = numbers[numbers.length - 1];
     const computedSum = individualSPs.reduce((sum, v) => sum + v, 0);
 
     if (computedSum > 0 && computedSum !== totalValue) {
