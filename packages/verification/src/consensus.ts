@@ -36,7 +36,9 @@ import type {
   VerdictDirection,
   ConsensusReliabilityProvider,
 } from "@prd-gen/core";
-import { DEFAULT_RELIABILITY_PRIOR } from "@prd-gen/core";
+// DEFAULT_RELIABILITY_PRIOR is not imported here: the prior-mean fallback it
+// backs moved to consensus-strategy.ts (see reliabilityPriorMean there, which
+// imports it directly) when this file was split for the §4.1 line cap.
 import { bayesian } from "./consensus-strategy.js";
 
 // Verdict severity for ordering — higher = more concerning.

@@ -1,5 +1,6 @@
 import type { ThinkingStrategy, StrategyTier } from "@prd-gen/core";
 import { STRATEGY_TIERS, getStrategyTier } from "@prd-gen/core";
+import { characteristicSet } from "./claim-analyzer.js";
 
 /**
  * Research evidence for strategy selection -- ported from ResearchEvidenceDatabase.swift.
@@ -21,12 +22,26 @@ export interface ResearchEvidence {
   readonly citation: string;
 }
 
-// ── Tier 1: Most Effective ──────────────────────────────────────────────────
+/**
+ * An evidence entry as hand-authored: everything except `tier`, which is not
+ * writable by hand. Omitting it makes re-introducing a literal `tier:` a
+ * compile error rather than a silent second source of truth.
+ */
+type AuthoredEvidence = Omit<ResearchEvidence, "tier">;
 
-const TIER_1_EVIDENCE: readonly ResearchEvidence[] = [
+/**
+ * Evidence as authored. `tier` is deliberately ABSENT here: it is derived
+ * from core's STRATEGY_TIERS at assembly (see ALL_EVIDENCE below), which is
+ * the single table that also supplies the selectionWeight calculateScore
+ * reads. Hand-writing it here produced a silent 5-strategy drift.
+ *
+ * The "Tier N" headings below are the original Swift port's editorial
+ * grouping and are NOT authoritative — read getStrategyTier() for the tier.
+ */
+const AUTHORED_EVIDENCE: readonly AuthoredEvidence[] = [
+// ── Tier 1: Most Effective ──────────────────────────────────────────────────
   {
     strategy: "recursive_refinement",
-    tier: 1,
     improvementPercent: 0.32,
     claimCharacteristics: [
       "mathematical_reasoning", "multi_step_logic", "complex_technical",
@@ -37,7 +52,6 @@ const TIER_1_EVIDENCE: readonly ResearchEvidence[] = [
   },
   {
     strategy: "recursive_refinement",
-    tier: 1,
     improvementPercent: 0.74,
     claimCharacteristics: [
       "mathematical_reasoning", "multi_step_logic", "self_correction", "high_precision",
@@ -47,7 +61,6 @@ const TIER_1_EVIDENCE: readonly ResearchEvidence[] = [
   },
   {
     strategy: "verified_reasoning",
-    tier: 1,
     improvementPercent: 0.18,
     claimCharacteristics: [
       "accuracy_critical", "fact_verification", "consistency_check", "high_precision",
@@ -57,7 +70,6 @@ const TIER_1_EVIDENCE: readonly ResearchEvidence[] = [
   },
   {
     strategy: "graph_of_thoughts",
-    tier: 1,
     improvementPercent: 0.62,
     claimCharacteristics: [
       "dependency_analysis", "cross_reference", "structural_reasoning", "complex_technical",
@@ -67,7 +79,6 @@ const TIER_1_EVIDENCE: readonly ResearchEvidence[] = [
   },
   {
     strategy: "self_consistency",
-    tier: 1,
     improvementPercent: 0.179,
     claimCharacteristics: [
       "mathematical_reasoning", "multiple_approaches", "consistency_check",
@@ -78,7 +89,6 @@ const TIER_1_EVIDENCE: readonly ResearchEvidence[] = [
   },
   {
     strategy: "reflexion",
-    tier: 1,
     improvementPercent: 0.21,
     claimCharacteristics: [
       "iterative_refinement", "self_correction", "quality_improvement", "code_generation",
@@ -88,7 +98,6 @@ const TIER_1_EVIDENCE: readonly ResearchEvidence[] = [
   },
   {
     strategy: "problem_analysis",
-    tier: 1,
     improvementPercent: 0.24,
     claimCharacteristics: [
       "complex_technical", "multi_dimensional", "structural_reasoning", "risk_analysis",
@@ -96,14 +105,11 @@ const TIER_1_EVIDENCE: readonly ResearchEvidence[] = [
     source: "Harvard/MIT (2024) — Structured Decomposition Outperforms Linear Reasoning",
     citation: "Harvard/MIT 2024",
   },
-];
 
 // ── Tier 2: Effective with Context ──────────────────────────────────────────
 
-const TIER_2_EVIDENCE: readonly ResearchEvidence[] = [
   {
     strategy: "tree_of_thoughts",
-    tier: 2,
     improvementPercent: 0.74,
     claimCharacteristics: [
       "exploratory_reasoning", "multiple_approaches", "creative_problems",
@@ -114,7 +120,6 @@ const TIER_2_EVIDENCE: readonly ResearchEvidence[] = [
   },
   {
     strategy: "react",
-    tier: 2,
     improvementPercent: 0.27,
     claimCharacteristics: [
       "codebase_integration", "tool_use", "external_knowledge", "cross_reference",
@@ -124,7 +129,6 @@ const TIER_2_EVIDENCE: readonly ResearchEvidence[] = [
   },
   {
     strategy: "meta_prompting",
-    tier: 2,
     improvementPercent: 0.171,
     claimCharacteristics: [
       "complex_technical", "multi_step_logic", "role_based_reasoning",
@@ -135,7 +139,6 @@ const TIER_2_EVIDENCE: readonly ResearchEvidence[] = [
   },
   {
     strategy: "plan_and_solve",
-    tier: 2,
     improvementPercent: 0.058,
     claimCharacteristics: [
       "multi_step_logic", "sequential_planning", "structural_reasoning",
@@ -143,14 +146,11 @@ const TIER_2_EVIDENCE: readonly ResearchEvidence[] = [
     source: "NUS (2023) — Plan-and-Solve Prompting: Improving Zero-Shot CoT",
     citation: "arXiv:2305.04091",
   },
-];
 
 // ── Tier 3: Specialized Use Cases ───────────────────────────────────────────
 
-const TIER_3_EVIDENCE: readonly ResearchEvidence[] = [
   {
     strategy: "few_shot",
-    tier: 3,
     improvementPercent: 0.25,
     claimCharacteristics: [
       "pattern_matching", "domain_specific", "example_based",
@@ -160,7 +160,6 @@ const TIER_3_EVIDENCE: readonly ResearchEvidence[] = [
   },
   {
     strategy: "generate_knowledge",
-    tier: 3,
     improvementPercent: 0.15,
     claimCharacteristics: [
       "domain_knowledge", "fact_generation", "commonsense_reasoning",
@@ -170,7 +169,6 @@ const TIER_3_EVIDENCE: readonly ResearchEvidence[] = [
   },
   {
     strategy: "multimodal_cot",
-    tier: 3,
     improvementPercent: 0.16,
     claimCharacteristics: [
       "visual_reasoning", "multimodal", "diagram_analysis",
@@ -178,14 +176,11 @@ const TIER_3_EVIDENCE: readonly ResearchEvidence[] = [
     source: "Amazon/UCLA (2023) — Multimodal Chain-of-Thought Reasoning",
     citation: "arXiv:2302.00923",
   },
-];
 
 // ── Tier 4: Basic (Free Tier) ───────────────────────────────────────────────
 
-const TIER_4_EVIDENCE: readonly ResearchEvidence[] = [
   {
     strategy: "chain_of_thought",
-    tier: 4,
     improvementPercent: 0.0,
     claimCharacteristics: ["basic_reasoning"],
     source: "Google/DeepMind (2024) — Chain-of-Thought Reasoning Without Prompting",
@@ -193,7 +188,6 @@ const TIER_4_EVIDENCE: readonly ResearchEvidence[] = [
   },
   {
     strategy: "zero_shot",
-    tier: 4,
     improvementPercent: 0.0,
     claimCharacteristics: [],
     source: "Various (2023) — Baseline comparison meta-analysis",
@@ -203,12 +197,17 @@ const TIER_4_EVIDENCE: readonly ResearchEvidence[] = [
 
 // ── Database ────────────────────────────────────────────────────────────────
 
-const ALL_EVIDENCE: readonly ResearchEvidence[] = [
-  ...TIER_1_EVIDENCE,
-  ...TIER_2_EVIDENCE,
-  ...TIER_3_EVIDENCE,
-  ...TIER_4_EVIDENCE,
-];
+/**
+ * The database, with each entry's tier DERIVED from core's STRATEGY_TIERS.
+ *
+ * source: coding-standards §3.2 — one source of truth. calculateScore indexes
+ *   STRATEGY_TIERS[ev.tier].selectionWeight, so a locally-authored tier meant
+ *   an entry could select its own weight out of a table it did not belong to.
+ */
+const ALL_EVIDENCE: readonly ResearchEvidence[] = AUTHORED_EVIDENCE.map((e) => ({
+  ...e,
+  tier: getStrategyTier(e.strategy),
+}));
 
 export class ResearchEvidenceDatabase {
   private readonly evidence: readonly ResearchEvidence[] = ALL_EVIDENCE;
@@ -238,7 +237,7 @@ export class ResearchEvidenceDatabase {
   getMatchingStrategies(
     characteristics: readonly string[],
   ): ResearchEvidence[] {
-    const charSet = new Set(characteristics);
+    const charSet = characteristicSet(characteristics);
     return this.evidence
       .filter((e) =>
         e.claimCharacteristics.some((c) => charSet.has(c)),
@@ -258,7 +257,7 @@ export class ResearchEvidenceDatabase {
 
     let totalScore = 0.0;
     for (const ev of matching) {
-      const evChars = new Set(ev.claimCharacteristics);
+      const evChars = characteristicSet(ev.claimCharacteristics);
       let overlap = 0;
       for (const c of characteristics) {
         if (evChars.has(c)) overlap++;

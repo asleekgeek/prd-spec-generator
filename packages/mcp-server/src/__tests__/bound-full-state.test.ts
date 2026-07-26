@@ -23,6 +23,7 @@ import {
   MAX_CLARIFICATION_TURNS,
   MAX_PIPELINE_ERRORS,
   MAX_RESPONSE_CHARS,
+  SectionTypeSchema,
   type PipelineState,
 } from "@prd-gen/orchestration";
 import {
@@ -78,8 +79,11 @@ function worstCaseState(): PipelineState {
   );
 
   // Sections with full markdown bodies.
+  // DISTINCT section types — a real worst-case state never repeats one, and
+  // sections are keyed by section_type downstream, so six "overview" entries
+  // would collapse to one and understate the payload this test must bound.
   const sections = Array.from({ length: 6 }, (_, i) => ({
-    section_type: "overview" as const,
+    section_type: SectionTypeSchema.options[i]!,
     status: "passed" as const,
     attempt: 1,
     violation_count: 0,

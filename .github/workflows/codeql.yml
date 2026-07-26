@@ -36,6 +36,10 @@ jobs:
         uses: github/codeql-action/init@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
         with:
           languages: javascript-typescript
+          # Scope the scan to source. mcp-server/index.js is an 82k-line
+          # esbuild bundle that produced 436 of 517 alerts, none actionable
+          # without patching the bundler; its SOURCE stays analysed.
+          config-file: ./.github/codeql/codeql-config.yml
           queries: security-and-quality
 
       - name: Perform CodeQL analysis

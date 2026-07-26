@@ -20,11 +20,13 @@
  * source: Wave D B7 remediation.
  */
 
+// JudgeReliabilityRecord is not imported here: this module reaches reliability
+// records only through ReliabilityLookup (imported below from consensus.ts,
+// which declares the record type in its signature at consensus.ts:95).
 import type {
   Verdict,
   JudgeVerdict,
   AgentIdentity,
-  JudgeReliabilityRecord,
   VerdictDirection,
   ConsensusReliabilityProvider,
 } from "@prd-gen/core";

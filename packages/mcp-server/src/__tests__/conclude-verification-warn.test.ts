@@ -1,48 +1,68 @@
 /**
- * B5 — Test that conclude_verification warns when claim_types is undefined
- * and the reliability repository is open (Curie A3).
+ * B5 — `buildConcludeOpts` warns when `claim_types` is omitted while the
+ * reliability repository is open (Curie A3 one-sided-censoring guard).
  *
- * Tests the warn condition directly by spying on console.warn. The warn
- * is emitted in pipeline-tools.ts:conclude_verification when:
- *   - claim_types === undefined (caller omitted the field)
- *   - reliabilityRepo !== null (a SQLite repo is wired)
+ * What is verified: the guard in build-conclude-opts.ts:
+ *   if (claim_types === undefined && reliabilityRepo !== null) console.warn(...)
+ * is exercised through the real exported function — the same one
+ * pipeline-tools.ts:conclude_verification calls — not re-simulated inline.
+ *
+ * Each test also asserts the CONSEQUENCE the warn is about (claimTypes and
+ * onObservation left undefined ⇒ observations are silently dropped), so the
+ * suite pins the causal link, not just the log line. §13.1 F1: the emission
+ * itself is asserted, and the nominal path is asserted quiet.
+ *
+ * Strategy: vi.mock on ../reliability-wiring.js supplies a stub repo (or null)
+ * so the guard's second operand is controlled without a real SQLite DB —
+ * matching the seam used by conclude-verification-claims-e2e.test.ts.
+ * FAILS_ON: test that needs a real reliability DB — intentional, this is a unit seam.
  *
  * source: Curie cross-audit Wave D, A3 anomaly resolution.
  * source: Wave D B5 remediation.
+ * Stakes: Medium — calibration infrastructure.
  */
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { buildConcludeOpts } from "../build-conclude-opts.js";
 
-describe("conclude_verification B5 warn condition", () => {
+// ─── Mock reliability-wiring so the guard's repo operand is controllable ──────
+
+const mocks = vi.hoisted(() => ({
+  repo: null as { recordObservation: () => void } | null,
+}));
+
+vi.mock("../reliability-wiring.js", () => ({
+  getReliabilityRepo: () => mocks.repo,
+  getConsensusReliabilityProvider: () => null,
+  closeReliabilityRepo: () => {},
+}));
+
+/** An open repository — satisfies the guard's `reliabilityRepo !== null` operand. */
+function openRepo(): { recordObservation: () => void } {
+  return { recordObservation: () => {} };
+}
+
+describe("buildConcludeOpts — B5 claim_types omission warn", () => {
+  beforeEach(() => {
+    mocks.repo = null;
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("warn condition fires when claim_types is undefined and repo is non-null", () => {
-    // Precondition: claim_types === undefined, reliabilityRepo !== null.
-    // Postcondition: the warn predicate evaluates to true.
-    //
-    // This test validates the guard condition logic extracted from
-    // pipeline-tools.ts:conclude_verification handler (B5):
-    //   if (claim_types === undefined && reliabilityRepo !== null) { console.warn(...) }
-    //
-    // We test the condition directly rather than mounting the full MCP server.
-    // source: Wave D B5 remediation — Curie A3.
-
+  it("warns, and drops the observation flusher, when claim_types is omitted and a repo is open", () => {
+    // Precondition: claim_types omitted by the caller, reliability repo open.
+    // Postcondition: exactly one warn naming the failure mode, AND the
+    //   ConcludeOptions carry neither claimTypes nor onObservation — the
+    //   silent data loss the warn exists to announce.
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mocks.repo = openRepo();
 
-    // Simulate the guard condition from pipeline-tools.ts.
-    const claim_types: Record<string, string> | undefined = undefined;
-    // Simulate an open repo (non-null sentinel).
-    const reliabilityRepo: object | null = {};
-
-    if (claim_types === undefined && reliabilityRepo !== null) {
-      console.warn(
-        "[reliability] WARNING: conclude_verification called without claim_types" +
-          " — observations will NOT be flushed to the calibration repository for" +
-          " this batch. This may produce one-sided censoring across runs.",
-      );
-    }
+    const opts = buildConcludeOpts({
+      consensus_strategy: "weighted_average",
+      run_id: "run-b5",
+    });
 
     expect(warnSpy).toHaveBeenCalledOnce();
     expect(warnSpy).toHaveBeenCalledWith(
@@ -51,37 +71,42 @@ describe("conclude_verification B5 warn condition", () => {
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("one-sided censoring"),
     );
+
+    // The consequence the operator is being warned about.
+    expect(opts.claimTypes).toBeUndefined();
+    expect(opts.onObservation).toBeUndefined();
   });
 
-  it("warn condition does NOT fire when claim_types is provided", () => {
-    // Precondition: claim_types is defined (caller provided the map).
-    // Postcondition: the warn predicate evaluates to false — no warn emitted.
+  it("stays quiet, and wires the flusher, when claim_types is provided", () => {
+    // Precondition: caller supplied the claim_id → claim_type map, repo open.
+    // Postcondition: no warn; claimTypes populated and onObservation wired,
+    //   i.e. observations WILL be flushed. Negative assertion per §13.1 G4.
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mocks.repo = openRepo();
 
-    const claim_types: Record<string, string> | undefined = {
-      "claim-001": "factual",
-    };
-    const reliabilityRepo: object | null = {};
-
-    if (claim_types === undefined && reliabilityRepo !== null) {
-      console.warn("should not appear");
-    }
+    const opts = buildConcludeOpts({
+      consensus_strategy: "weighted_average",
+      run_id: "run-b5",
+      claim_types: { "claim-001": "correctness" },
+    });
 
     expect(warnSpy).not.toHaveBeenCalled();
+    expect(opts.claimTypes?.get("claim-001")).toBe("correctness");
+    expect(opts.onObservation).toBeDefined();
   });
 
-  it("warn condition does NOT fire when reliabilityRepo is null (no repo open)", () => {
-    // Precondition: reliabilityRepo is null (better-sqlite3 unavailable).
-    // Postcondition: no warn — omitting claim_types is harmless when no repo.
+  it("stays quiet when no repo is open — omitting claim_types is then harmless", () => {
+    // Precondition: better-sqlite3 absent / DB unopenable ⇒ getReliabilityRepo() null.
+    // Postcondition: no warn (nothing to censor), and no flusher is wired.
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mocks.repo = null;
 
-    const claim_types: Record<string, string> | undefined = undefined;
-    const reliabilityRepo: object | null = null;
-
-    if (claim_types === undefined && reliabilityRepo !== null) {
-      console.warn("should not appear");
-    }
+    const opts = buildConcludeOpts({
+      consensus_strategy: "weighted_average",
+      run_id: "run-b5",
+    });
 
     expect(warnSpy).not.toHaveBeenCalled();
+    expect(opts.onObservation).toBeUndefined();
   });
 });

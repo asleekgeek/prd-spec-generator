@@ -25,11 +25,10 @@ import {
   type SectionStatus,
 } from "../../types/state.js";
 import { validateSection } from "@prd-gen/validation";
-import {
-  SECTION_DISPLAY_NAMES,
-  type PRDContext,
-  type SectionType,
-} from "@prd-gen/core";
+// SectionType is not imported: every section type in this module arrives as
+// SectionStatus.section_type, which state/section-status.ts already types via
+// SectionTypeSchema.
+import { SECTION_DISPLAY_NAMES, type PRDContext } from "@prd-gen/core";
 import type { StrategyAssignment, ExecutionResult } from "@prd-gen/strategy";
 import { MAX_ATTEMPTS } from "../section-generation-constants.js";
 

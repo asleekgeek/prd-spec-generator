@@ -12,26 +12,33 @@
 import { describe, it, expect } from "vitest";
 import { specOracle } from "../spec-oracle.js";
 
-// A minimal "requirements" section that passes the rules applicable to that
-// section type. We use a very short snippet that doesn't trigger any of the
-// 5 requirements-level rules (sp_not_in_fr_table, fr_traceability,
-// no_self_referencing_deps, duplicate_requirement_ids, fr_numbering_gaps).
-// An empty section satisfies all pattern-matching rules (no violations).
+// A "requirements" section that triggers NONE of the requirements-level rules
+// (sp_not_in_fr_table, fr_traceability, no_self_referencing_deps,
+// duplicate_requirement_ids, fr_numbering_gaps). Verified: 0 violations.
+//
+// Prose, not an FR table: fr_traceability fires on an FR table whose AC
+// references do not resolve within the section, so ANY self-contained FR
+// table is a violation, not a clean fixture. The previous content here was
+// exactly such a table and produced 1 violation despite its name — it was
+// never referenced by a test, so nothing caught it.
 const CLEAN_REQUIREMENTS_SECTION = `
 ## Functional Requirements
 
-| ID | Title | Description | AC | Priority | SP |
-|---|---|---|---|---|---|
-| FR-001 | Login | User can log in | AC-001 | High | 3 |
-| FR-002 | Logout | User can log out | AC-002 | High | 2 |
+The system shall provide authentication.
 `;
 
-// A requirements section that triggers fr_traceability: references to
-// non-existent ACs.
+// A requirements section that triggers duplicate_requirement_ids (FR-001
+// twice) — and fr_traceability, since the AC column is absent.
+// Verified: 2 violations. The previous content here was a story-point list
+// that triggered NOTHING, so the test asserting "duplicate requirement IDs"
+// below was passing vacuously.
 const BAD_REQUIREMENTS_SECTION = `
-## Story Point Distribution
-- FR-001: SP 3
-- FR-001: SP 3
+## Functional Requirements
+
+| ID | Title | Description | Priority |
+|---|---|---|---|
+| FR-001 | Login | User can log in | High |
+| FR-001 | Login again | Duplicate id | High |
 `;
 
 // overview section — very few rules apply; clean content should pass.
@@ -82,21 +89,36 @@ describe("specOracle", () => {
     expect(result.oracle_evidence).toContain("truth=false");
   });
 
+  it("clean requirements section + expected_passes=true → truth=true", async () => {
+    // Positive control for the `requirements` section type — the fixture was
+    // declared but never exercised, so only the failing path was covered.
+    const result = await specOracle({
+      markdown: CLEAN_REQUIREMENTS_SECTION,
+      section_type: "requirements",
+      expected_passes: true,
+    });
+
+    expect(result.truth).toBe(true);
+    expect(result.oracle_evidence).toContain("actually_passes=true");
+    expect(result.oracle_evidence).toContain("truth=true");
+  });
+
   it("section with duplicate requirement IDs + expected_passes=false → truth=true", async () => {
-    // Duplicate FR-001 triggers duplicate_requirement_ids violation.
+    // Duplicate FR-001 triggers duplicate_requirement_ids (and fr_traceability,
+    // since the AC column is absent). The section fails validation and the
+    // claim says it should fail, so truth = (false === false) = true.
     const result = await specOracle({
       markdown: BAD_REQUIREMENTS_SECTION,
       section_type: "requirements",
       expected_passes: false,
     });
 
-    // The section fails validation; the claim says it should fail.
-    // truth = (false === false) = true OR (true === false) = false depending
-    // on whether the bad content actually triggers any rule.
-    // We only assert the invariants that must always hold:
-    expect(result.oracle_evidence).toBeTruthy();
+    // Asserted concretely — this test previously only checked
+    // `typeof result.truth === "boolean"`, which held for either outcome.
+    expect(result.truth).toBe(true);
+    expect(result.oracle_evidence).toContain("actually_passes=false");
+    expect(result.oracle_evidence).toContain("truth=true");
     expect(result.oracle_evidence).toContain("internally-grounded");
-    expect(typeof result.truth).toBe("boolean");
   });
 
   it("oracle_evidence includes violation count", async () => {

@@ -18,7 +18,8 @@
  * Hashes:
  *   - claim_set_hash    = sha256(sorted-newline-joined ALL claim_ids)
  *   - partition_hash    = sha256(sorted-newline-joined HELD-OUT claim_ids)
- *                         (recorded as a sidecar /tmp file for replay; the
+ *                         (also written to an owner-private temp dir for
+ *                          replay — path printed at the end of the run; the
  *                          v2 lock schema does NOT have a partition_hash field,
  *                          but the held-out claim list itself is reproducible
  *                          from corpus + seed + this script.)
@@ -27,7 +28,9 @@
  * source: ablation-pairing-helpers.ts:stringSeedToNumber (FNV-1a 32-bit).
  */
 
-import { writeFileSync, readFileSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdtempSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 
 const CORPUS_PATH =
@@ -153,16 +156,24 @@ const lock = {
 
 writeFileSync(LOCK_PATH, JSON.stringify(lock, null, 2) + "\n", "utf8");
 
-writeFileSync(
-  "/tmp/reliability-heldout-claim-ids.txt",
-  [...heldout].sort().join("\n") + "\n",
-  "utf8",
-);
+// The lock commits only `claim_set_hash`; the claim IDs ARE the held-out half
+// and are deliberately not committed. A fixed path in the shared temp dir
+// defeated that twice over: world-readable, so the holdout leaks to any local
+// user, and predictable, so it can be pre-created as a symlink and made to
+// overwrite a file of the attacker's choosing (js/insecure-temporary-file).
+//
+// Nothing reads this file back — it is an operator convenience after a seal —
+// so keep it, in a directory the OS creates atomically at mode 0700, and print
+// where it landed rather than hard-coding a name the operator must know.
+const heldoutOutDir = mkdtempSync(join(tmpdir(), "prd-gen-heldout-"));
+const heldoutIdsPath = join(heldoutOutDir, "reliability-heldout-claim-ids.txt");
+writeFileSync(heldoutIdsPath, [...heldout].sort().join("\n") + "\n", "utf8");
 
 console.log("Sealed §4.1 reliability lock:");
+console.log(`  heldout ids  = ${heldoutIdsPath}`);
 console.log(`  partition_size = ${partition_size}`);
 console.log(`  breakdown = ${JSON.stringify(breakdown)}`);
 console.log(`  claim_set_hash = ${claim_set_hash}`);
 console.log(`  partition_hash (sidecar) = ${partition_hash_sidecar}`);
 console.log(`  sealed_at = ${sealed_at}`);
-console.log(`  held-out claim_ids written to /tmp/reliability-heldout-claim-ids.txt`);
+// (path already reported above as `heldout ids`)

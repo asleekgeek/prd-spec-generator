@@ -15,7 +15,7 @@
 import { describe, it, expect } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import {
@@ -227,8 +227,7 @@ function makeLockJson(
 }
 
 function makeTmpDir(): string {
-  const dir = join(tmpdir(), `seal-test-${randomUUID()}`);
-  mkdirSync(dir, { recursive: true });
+  const dir = mkdtempSync(join(tmpdir(), "seal-test-"));
   return dir;
 }
 

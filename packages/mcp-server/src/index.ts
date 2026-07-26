@@ -41,7 +41,6 @@ import {
 } from "./tool-profiles.js";
 import {
   checkReliabilityHealth,
-  getConsensusReliabilityProvider,
   closeReliabilityRepo,
 } from "./reliability-wiring.js";
 

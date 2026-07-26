@@ -4,9 +4,15 @@ import type {
   ValidationReport,
   SectionType,
 } from "@prd-gen/core";
-import { isCriticalRule, scorePenalty } from "@prd-gen/core";
+// isCriticalRule / scorePenalty are applied in rules/helpers.ts's makeViolation
+// factory; this module reads the resulting `isCritical` / `scorePenalty` FIELDS
+// off each violation, never the functions.
 
-import { rulesForSection, DOCUMENT_LEVEL_RULES } from "./rule-mapping.js";
+import {
+  rulesForSection,
+  DOCUMENT_LEVEL_RULES,
+  type DocumentLevelRule,
+} from "./rule-mapping.js";
 
 // SP Rules (1, 8, 9)
 import {
@@ -359,6 +365,38 @@ export function validateSection(
  * Runs section-level validation on each section, then document-level checks
  * (SP arithmetic across all stories, cross-file AC numbering, etc.).
  */
+/** Everything a cross-section checker may read. */
+interface DocumentCheckInput {
+  readonly sections: ReadonlyArray<{ type: SectionType; content: string }>;
+  readonly combinedContent: string;
+}
+
+/**
+ * Cross-section checker for every rule in DOCUMENT_LEVEL_RULES.
+ *
+ * Total by construction: `Record<DocumentLevelRule, …>` makes a rule declared
+ * document-level without a checker a compile error, which is the drift this
+ * table was added to close — DOCUMENT_LEVEL_RULES previously listed 7 rules
+ * while validateDocument hand-called 6, and nothing detected the gap because
+ * the constant had no consumer.
+ *
+ * source: coding-standards §1.2 OCP — new document rule = one list entry +
+ *   one table entry, zero edits to the dispatch loop.
+ */
+const DOCUMENT_LEVEL_CHECKS: Readonly<
+  Record<DocumentLevelRule, (input: DocumentCheckInput) => HardOutputRuleViolation[]>
+> = {
+  sp_arithmetic: ({ sections }) => checkDocumentSPArithmetic(sections),
+  ac_numbering: ({ combinedContent }) =>
+    checkDocumentACConsistency(combinedContent),
+  honest_verification_verdicts: ({ sections }) =>
+    checkDocumentVerificationVerdicts(sections),
+  test_traceability_integrity: ({ sections }) =>
+    checkDocumentTestTraceability(sections),
+  fr_to_ac_coverage: ({ sections }) => checkDocumentFRToACCoverage(sections),
+  ac_to_test_coverage: ({ sections }) => checkDocumentACToTestCoverage(sections),
+};
+
 export function validateDocument(
   sections: ReadonlyArray<{ type: SectionType; content: string }>,
 ): ValidationReport {
@@ -390,18 +428,10 @@ export function validateDocument(
     }
   };
 
-  addDocCheck("sp_arithmetic", checkDocumentSPArithmetic(sections));
-  addDocCheck("ac_numbering", checkDocumentACConsistency(combinedContent));
-  addDocCheck(
-    "honest_verification_verdicts",
-    checkDocumentVerificationVerdicts(sections),
-  );
-  addDocCheck(
-    "test_traceability_integrity",
-    checkDocumentTestTraceability(sections),
-  );
-  addDocCheck("fr_to_ac_coverage", checkDocumentFRToACCoverage(sections));
-  addDocCheck("ac_to_test_coverage", checkDocumentACToTestCoverage(sections));
+  const input: DocumentCheckInput = { sections, combinedContent };
+  for (const rule of DOCUMENT_LEVEL_RULES) {
+    addDocCheck(rule, DOCUMENT_LEVEL_CHECKS[rule](input));
+  }
 
   // Remove violated rules from passed set
   const violatedRules = new Set(allViolations.map((v) => v.rule));
@@ -425,4 +455,8 @@ export function validateDocument(
 }
 
 // Re-export for consumers
-export { rulesForSection, DOCUMENT_LEVEL_RULES } from "./rule-mapping.js";
+export {
+  rulesForSection,
+  DOCUMENT_LEVEL_RULES,
+  type DocumentLevelRule,
+} from "./rule-mapping.js";

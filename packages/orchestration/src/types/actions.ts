@@ -19,12 +19,12 @@
  */
 
 import { z } from "zod";
-import {
-  PRDContextSchema,
-  SectionTypeSchema,
-  VerdictSchema,
-  JudgeVerdictSchema,
-} from "@prd-gen/core";
+// PRDContextSchema / SectionTypeSchema are deliberately NOT imported here.
+// The action envelope is transport-generic (opaque `arguments` records +
+// correlation ids); PRD context and section type are typed where they are
+// actually carried — state/core-state.ts (prd_context), state/section-status.ts
+// (section_type) — and parsed at handlers/context-detection.ts.
+import { VerdictSchema, JudgeVerdictSchema } from "@prd-gen/core";
 
 // ─── Action 1: ask_user ─────────────────────────────────────────────────────
 

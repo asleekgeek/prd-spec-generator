@@ -223,7 +223,10 @@ export function computeAblationComparison(
   observationLogPath: string,
   lockPath: string,
 ): AblationComparisonReport {
-  const entries = readJsonl(observationLogPath, ObservationLogEntrySchema);
+  const entries: ObservationLogEntry[] = readJsonl(
+    observationLogPath,
+    ObservationLogEntrySchema,
+  );
   const runIds = [...new Set(entries.map((e) => e.run_id))];
   // FAILS_ON: lock missing/unsealed → throws.
   verifyMaxAttemptsHeldoutSeal(runIds, lockPath);
@@ -302,7 +305,10 @@ export function computeReliabilityComparison(
   lockPath: string,
 ): ReliabilityComparisonReport {
   const lock: ReliabilityHeldoutLock = verifyReliabilityHeldoutSeal(lockPath);
-  const entries = readJsonl(observationLogPath, ObservationLogEntrySchema);
+  const entries: ObservationLogEntry[] = readJsonl(
+    observationLogPath,
+    ObservationLogEntrySchema,
+  );
 
   // Separate entries by oracle grounding presence.
   // FAILS_ON: entries with oracle_resolved_truth=undefined → circularity warning logged.
@@ -428,7 +434,10 @@ export function computeKpiGateComparison(
     };
   }
 
-  const entries = readJsonl(gateBlockedLogPath, GateBlockedEntrySchema);
+  const entries: GateBlockedEntry[] = readJsonl(
+    gateBlockedLogPath,
+    GateBlockedEntrySchema,
+  );
 
   type Labeled = { run_id: string; pass: boolean };
   const controlList: Labeled[] = [];

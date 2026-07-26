@@ -14,6 +14,7 @@ export default defineConfig({
       "./packages/meta-prompting/vitest.config.ts",
       "./packages/mcp-server/vitest.config.ts",
       "./packages/orchestration/vitest.config.ts",
+      "./packages/strategy/vitest.config.ts",
       "./packages/validation/vitest.config.ts",
       "./packages/verification/vitest.config.ts",
       "./scripts/release/vitest.config.ts",

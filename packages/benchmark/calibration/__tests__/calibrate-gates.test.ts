@@ -15,7 +15,7 @@
  * source: D3.1-D3.6 brief (Wave D K≥100 calibration runner).
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   mkdirSync,
   rmSync,

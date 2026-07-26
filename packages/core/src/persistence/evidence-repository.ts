@@ -1,7 +1,10 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { mkdirSync, existsSync } from "node:fs";
-import type { ThinkingStrategy, PRDContext, HardOutputRule } from "../index.js";
+// HardOutputRule is not imported: this repository persists rule COUNTS
+// (rules_checked / rules_passed / critical_violations, all INTEGER columns),
+// never rule identities. Those live on ValidationReport in the domain layer.
+import type { ThinkingStrategy, PRDContext } from "../index.js";
 
 /**
  * Minimal structural interface for the better-sqlite3 Database constructor

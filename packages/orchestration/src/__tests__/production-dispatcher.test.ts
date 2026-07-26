@@ -14,7 +14,7 @@
  *  - F2.E.7: stub invoker warm-cortex behaviour controlled by hit probability.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   makeProductionDispatcher,
   makeStubAgentInvoker,

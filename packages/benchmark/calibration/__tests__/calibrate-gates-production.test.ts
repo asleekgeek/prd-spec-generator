@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { mkdirSync, rmSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -31,15 +31,17 @@ import {
   type AgentInvoker,
 } from "@prd-gen/orchestration";
 
-const TMP_PREFIX = join(
-  tmpdir(),
-  `calib-prod-test-${process.pid}-${Date.now()}`,
-);
-let counter = 0;
+/**
+ * Atomic temp dir per call. mkdtempSync creates the directory as part of
+ * choosing its name, so no other process can win a race to that path — a
+ * `${pid}-${Date.now()}-${counter}` prefix is predictable and was flagged
+ * js/insecure-temporary-file once these tests began WRITING artefacts into
+ * it (the frozen-baseline fixtures below).
+ *
+ * source: the same fix applied repo-wide in 24316ee.
+ */
 function freshTmp(): string {
-  const dir = `${TMP_PREFIX}-${counter++}`;
-  mkdirSync(dir, { recursive: true });
-  return dir;
+  return mkdtempSync(join(tmpdir(), "calib-prod-test-"));
 }
 
 function makeFastDeterministicInvoker(): AgentInvoker {
@@ -141,6 +143,91 @@ describe("runProductionCalibration — F2.E (runner)", () => {
       readFileSync(join(dir, PRODUCTION_OUTPUT_BASENAME), "utf8"),
     ) as { data_source: string };
     expect(raw.data_source).toBe("production_pilot_K=3");
+  });
+});
+
+describe("frozen-baseline pre-flight (production series)", () => {
+  /**
+   * The production runner stamped `frozen_baseline_content_hash` on every run
+   * but never read the recorded value back, so a `pipeline-kpis.ts` edit
+   * between two production K-batches was silently absorbed. The canned runner
+   * (calibrate-gates.ts) has always enforced this ratchet; these tests pin the
+   * production counterpart.
+   *
+   * source: docs/PHASE_4_PLAN.md §4.5 — Popper AP-1 ratchet protection.
+   */
+  function seedArtefact(
+    dir: string,
+    body: { gates: unknown[]; frozen_baseline_content_hash?: string },
+  ): void {
+    writeFileSync(
+      join(dir, PRODUCTION_OUTPUT_BASENAME),
+      JSON.stringify(body, null, 2),
+      "utf8",
+    );
+  }
+
+  function baseOptions(dir: string) {
+    return {
+      k: 2,
+      eventRateK: 2,
+      outputDir: dir,
+      frozenBaselineCommit: "test",
+      featureDescription: "feat",
+      codebasePath: "/tmp/test-prod",
+      inMemoryOnly: true,
+      agentInvoker: makeFastDeterministicInvoker(),
+      agentInvokerClass: "stub-deterministic-test",
+    };
+  }
+
+  it("aborts when a SEALED artefact records a different content hash", async () => {
+    const dir = freshTmp();
+    seedArtefact(dir, {
+      gates: [{ gate_name: "wall_time_ms_max" }],
+      frozen_baseline_content_hash: "0".repeat(64),
+    });
+    await expect(runProductionCalibration(baseOptions(dir))).rejects.toThrow(
+      /frozen-baseline content hash mismatch \(production series\)/,
+    );
+  });
+
+  it("skipFrozenBaselineCheck bypasses the abort", async () => {
+    const dir = freshTmp();
+    seedArtefact(dir, {
+      gates: [{ gate_name: "wall_time_ms_max" }],
+      frozen_baseline_content_hash: "0".repeat(64),
+    });
+    const result = await runProductionCalibration({
+      ...baseOptions(dir),
+      skipFrozenBaselineCheck: true,
+    });
+    expect(result.gateCalibration.k_achieved).toBe(2);
+  });
+
+  it("an UNSEALED artefact (gates: []) is not a baseline and passes", async () => {
+    const dir = freshTmp();
+    seedArtefact(dir, {
+      gates: [],
+      frozen_baseline_content_hash: "0".repeat(64),
+    });
+    const result = await runProductionCalibration(baseOptions(dir));
+    expect(result.gateCalibration.k_achieved).toBe(2);
+  });
+
+  it("a malformed artefact is treated as no baseline, not a hard failure", async () => {
+    const dir = freshTmp();
+    writeFileSync(join(dir, PRODUCTION_OUTPUT_BASENAME), "{not json", "utf8");
+    const result = await runProductionCalibration(baseOptions(dir));
+    expect(result.gateCalibration.k_achieved).toBe(2);
+  });
+
+  it("records the CURRENT hash when no prior artefact exists", async () => {
+    const dir = freshTmp();
+    const result = await runProductionCalibration(baseOptions(dir));
+    expect(result.gateCalibration.frozen_baseline_content_hash).toMatch(
+      /^[0-9a-f]{64}$/,
+    );
   });
 });
 

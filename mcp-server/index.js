@@ -23424,6 +23424,14 @@ var STRATEGY_TIERS = {
     ]
   }
 };
+function getStrategyTier(strategy) {
+  for (const [tier, config5] of Object.entries(STRATEGY_TIERS)) {
+    if (config5.strategies.includes(strategy)) {
+      return Number(tier);
+    }
+  }
+  return 4;
+}
 
 // packages/core/dist/domain/clarification.js
 var ClarificationAnswerSchema = external_exports.object({
@@ -24458,6 +24466,14 @@ var SECTION_RULES = {
 function rulesForSection(sectionType) {
   return [...SECTION_RULES[sectionType]];
 }
+var DOCUMENT_LEVEL_RULES = [
+  "sp_arithmetic",
+  "ac_numbering",
+  "honest_verification_verdicts",
+  "test_traceability_integrity",
+  "fr_to_ac_coverage",
+  "ac_to_test_coverage"
+];
 
 // packages/validation/dist/hard-output-rules/rules/helpers.js
 function findPatternViolations(pattern, content, rule, sectionType, message) {
@@ -24504,11 +24520,12 @@ function makeViolation(rule, sectionType, message, offendingContent = null) {
   };
 }
 function extractCodeBlocks(content) {
-  const pattern = /```(?:\w+)?\s*\n([\s\S]*?)```/g;
+  const pattern = /```(?:\w+)?[ \t]*\r?\n([\s\S]*?)```/g;
+  const LEADING_BLANK = /^(?:[ \t]*\r?\n)+/;
   const blocks = [];
   let match;
   while ((match = pattern.exec(content)) !== null) {
-    blocks.push(match[1]);
+    blocks.push(match[1].replace(LEADING_BLANK, ""));
   }
   return blocks;
 }
@@ -24536,10 +24553,15 @@ function checkSPNotInFRTable(content, sectionType) {
   return findPatternViolations(/^\s*\|(?:[^|]*\|)*[^|]*(?:Story\s*Points?)[^|]*\|/gim, content, "sp_not_in_fr_table", sectionType, "FR table contains Story Points column \u2014 SP belongs only in Implementation Roadmap");
 }
 function checkUnevenSPDistribution(content, sectionType) {
-  const sprintPattern = /(?:sprint|iteration)\s*\d+[^|]*?\|\s*(\d+)\s*(?:SP|story\s*points?)/gim;
+  const sprintLabel = /(?:sprint|iteration)\s*\d+/i;
+  const spCell = /\|\s*(\d+)\s*(?:SP|story\s*points?)/i;
   const spValues = [];
-  let match;
-  while ((match = sprintPattern.exec(content)) !== null) {
+  for (const line of content.split("\n")) {
+    if (!sprintLabel.test(line))
+      continue;
+    const match = spCell.exec(line);
+    if (!match)
+      continue;
     const val = parseInt(match[1], 10);
     if (!isNaN(val))
       spValues.push(val);
@@ -24554,37 +24576,28 @@ function checkUnevenSPDistribution(content, sectionType) {
   }
   return [];
 }
+var NUMBER_PATTERN = /(\d+)/g;
+function trailingNumberIn(cellsText) {
+  const numbers = [...cellsText.matchAll(NUMBER_PATTERN)].map((m) => parseInt(m[1], 10));
+  return numbers.length > 0 ? numbers[numbers.length - 1] : null;
+}
 function checkSPArithmetic(content, sectionType) {
   const totalRowPattern = /^\s*\|\s*(?:\*{0,2})(?:Total|Sum|Grand\s+Total)(?:\*{0,2})\s*\|(.+)\|/gim;
-  const numberPattern = /(\d+)/g;
   const dataRowPattern = /^\s*\|\s*(?!\s*(?:-|(?:\*{0,2})(?:Total|Sum|Grand\s+Total)))([^|]+)\|(.+)\|/gim;
   const individualSPs = [];
   let dataMatch;
   while ((dataMatch = dataRowPattern.exec(content)) !== null) {
-    const cellsText = dataMatch[2];
-    const numbers = [];
-    let numMatch;
-    const numRegex = /(\d+)/g;
-    while ((numMatch = numRegex.exec(cellsText)) !== null) {
-      numbers.push(parseInt(numMatch[1], 10));
-    }
-    if (numbers.length > 0) {
-      individualSPs.push(numbers[numbers.length - 1]);
+    const rowSP = trailingNumberIn(dataMatch[2]);
+    if (rowSP !== null) {
+      individualSPs.push(rowSP);
     }
   }
   const violations = [];
   let totalMatch;
   while ((totalMatch = totalRowPattern.exec(content)) !== null) {
-    const cellsText = totalMatch[1];
-    const numbers = [];
-    let numMatch;
-    const numRegex = /(\d+)/g;
-    while ((numMatch = numRegex.exec(cellsText)) !== null) {
-      numbers.push(parseInt(numMatch[1], 10));
-    }
-    if (numbers.length === 0)
+    const totalValue = trailingNumberIn(totalMatch[1]);
+    if (totalValue === null)
       continue;
-    const totalValue = numbers[numbers.length - 1];
     const computedSum = individualSPs.reduce((sum3, v) => sum3 + v, 0);
     if (computedSum > 0 && computedSum !== totalValue) {
       violations.push(makeViolation("sp_arithmetic", sectionType, `SP total row shows ${totalValue} but individual rows sum to ${computedSum}`, `Total: ${totalValue}, Computed: ${computedSum}`));
@@ -24664,12 +24677,21 @@ function checkDocumentVerificationVerdicts(sections) {
   return checkHonestVerificationVerdicts(combinedContent, "performance_requirements");
 }
 function checkRiskMitigationCompleteness(content, sectionType) {
-  const headerPattern = /^\s*\|[^\n]*(?:Risk|Threat)[^\n]*(?:Mitigation|Response|Action)[^\n]*\|/gim;
-  if (!headerPattern.test(content))
+  const RISK_WORDS = ["risk", "threat"];
+  const ACTION_WORDS = ["mitigation", "response", "action"];
+  const hasRiskHeader = content.split("\n").some((line) => {
+    const trimmed = line.trimStart();
+    if (!trimmed.startsWith("|"))
+      return false;
+    const lower = trimmed.toLowerCase();
+    return RISK_WORDS.some((w) => lower.includes(w)) && ACTION_WORDS.some((w) => lower.includes(w));
+  });
+  if (!hasRiskHeader)
     return [];
   const rowPattern = /^\s*\|(?!\s*[-:]+\s*\|)(.+)\|/gm;
   const violations = [];
-  const emptyMitigationPattern = /^\s*(?:-|N\/?A|TBD|TODO|None)?\s*$/i;
+  const PLACEHOLDER_MITIGATIONS = /* @__PURE__ */ new Set(["", "-", "n/a", "na", "tbd", "todo", "none"]);
+  const isPlaceholderMitigation = (cell) => PLACEHOLDER_MITIGATIONS.has(cell.trim().toLowerCase());
   let index2 = 0;
   let match;
   while ((match = rowPattern.exec(content)) !== null) {
@@ -24684,7 +24706,7 @@ function checkRiskMitigationCompleteness(content, sectionType) {
     const lastCell = cells[cells.length - 1];
     if (lastCell === void 0)
       continue;
-    if (emptyMitigationPattern.test(lastCell)) {
+    if (isPlaceholderMitigation(lastCell)) {
       const riskDescription = cells[0] ?? "Unknown";
       violations.push(makeViolation("risk_mitigation_completeness", sectionType, `Risk '${riskDescription.substring(0, 60)}' has empty or placeholder mitigation`, `Mitigation: ${lastCell.length === 0 ? "(empty)" : lastCell}`));
     }
@@ -24736,11 +24758,17 @@ function checkACNumbering(content, sectionType) {
   return [];
 }
 function checkFRTraceability(content, sectionType) {
-  const tableHeaderPattern = /^\s*\|[^\n]*\bID\b[^\n]*(?:Requirement|Description)[^\n]*\|/gim;
-  if (!tableHeaderPattern.test(content))
+  const ID_WORD = /\bID\b/i;
+  const isTableRow = (line) => line.trimStart().startsWith("|");
+  const hasHeaderWith = (words) => content.split("\n").some((line) => {
+    if (!isTableRow(line) || !ID_WORD.test(line))
+      return false;
+    const lower = line.toLowerCase();
+    return words.some((w) => lower.includes(w));
+  });
+  if (!hasHeaderWith(["requirement", "description"]))
     return [];
-  const sourcePattern = /^\s*\|[^\n]*\bID\b[^\n]*\bSource\b[^\n]*\|/gim;
-  if (!sourcePattern.test(content)) {
+  if (!hasHeaderWith(["source"])) {
     return [
       makeViolation("fr_traceability", sectionType, "FR table exists but lacks a Source/Traceability column \u2014 every FR must trace to its origin")
     ];
@@ -27501,6 +27529,14 @@ function validateSection(content, sectionType) {
     checkedAt: (/* @__PURE__ */ new Date()).toISOString()
   };
 }
+var DOCUMENT_LEVEL_CHECKS = {
+  sp_arithmetic: ({ sections }) => checkDocumentSPArithmetic(sections),
+  ac_numbering: ({ combinedContent }) => checkDocumentACConsistency(combinedContent),
+  honest_verification_verdicts: ({ sections }) => checkDocumentVerificationVerdicts(sections),
+  test_traceability_integrity: ({ sections }) => checkDocumentTestTraceability(sections),
+  fr_to_ac_coverage: ({ sections }) => checkDocumentFRToACCoverage(sections),
+  ac_to_test_coverage: ({ sections }) => checkDocumentACToTestCoverage(sections)
+};
 function validateDocument(sections) {
   const allViolations = [];
   const allRulesChecked = /* @__PURE__ */ new Set();
@@ -27523,12 +27559,10 @@ function validateDocument(sections) {
       allViolations.push(...violations);
     }
   };
-  addDocCheck("sp_arithmetic", checkDocumentSPArithmetic(sections));
-  addDocCheck("ac_numbering", checkDocumentACConsistency(combinedContent));
-  addDocCheck("honest_verification_verdicts", checkDocumentVerificationVerdicts(sections));
-  addDocCheck("test_traceability_integrity", checkDocumentTestTraceability(sections));
-  addDocCheck("fr_to_ac_coverage", checkDocumentFRToACCoverage(sections));
-  addDocCheck("ac_to_test_coverage", checkDocumentACToTestCoverage(sections));
+  const input = { sections, combinedContent };
+  for (const rule of DOCUMENT_LEVEL_RULES) {
+    addDocCheck(rule, DOCUMENT_LEVEL_CHECKS[rule](input));
+  }
   const violatedRules = new Set(allViolations.map((v) => v.rule));
   for (const rule of violatedRules) {
     allRulesPassed.delete(rule);
@@ -30375,277 +30409,6 @@ var MAX_CLARIFICATION_TURNS = Math.floor(MAX_RESPONSE_CHARS / 2 / CLARIFICATION_
 var ERROR_MESSAGE_CHARS = 500;
 var MAX_PIPELINE_ERRORS = Math.floor(MAX_RESPONSE_CHARS / 4 / ERROR_MESSAGE_CHARS);
 
-// packages/strategy/dist/research-evidence-database.js
-var TIER_1_EVIDENCE = [
-  {
-    strategy: "recursive_refinement",
-    tier: 1,
-    improvementPercent: 0.32,
-    claimCharacteristics: [
-      "mathematical_reasoning",
-      "multi_step_logic",
-      "complex_technical",
-      "iterative_refinement",
-      "high_precision"
-    ],
-    source: "DeepSeek (2025) \u2014 DeepSeek-R1: Incentivizing Reasoning Capability in LLMs",
-    citation: "arXiv:2501.12948"
-  },
-  {
-    strategy: "recursive_refinement",
-    tier: 1,
-    improvementPercent: 0.74,
-    claimCharacteristics: [
-      "mathematical_reasoning",
-      "multi_step_logic",
-      "self_correction",
-      "high_precision"
-    ],
-    source: "OpenAI (2024) \u2014 Learning to Reason with LLMs",
-    citation: "OpenAI technical report (non-peer-reviewed)"
-  },
-  {
-    strategy: "verified_reasoning",
-    tier: 1,
-    improvementPercent: 0.18,
-    claimCharacteristics: [
-      "accuracy_critical",
-      "fact_verification",
-      "consistency_check",
-      "high_precision"
-    ],
-    source: "Stanford/Anthropic (2024) \u2014 Chain-of-Verification Reduces Hallucination in LLMs",
-    citation: "Stanford/Anthropic 2024"
-  },
-  {
-    strategy: "graph_of_thoughts",
-    tier: 1,
-    improvementPercent: 0.62,
-    claimCharacteristics: [
-      "dependency_analysis",
-      "cross_reference",
-      "structural_reasoning",
-      "complex_technical"
-    ],
-    source: "ETH Zurich (2024) \u2014 Graph of Thoughts: Solving Elaborate Problems with LLMs",
-    citation: "arXiv:2308.09687"
-  },
-  {
-    strategy: "self_consistency",
-    tier: 1,
-    improvementPercent: 0.179,
-    claimCharacteristics: [
-      "mathematical_reasoning",
-      "multiple_approaches",
-      "consistency_check",
-      "uncertainty_handling"
-    ],
-    source: "Google Research (2023) \u2014 Self-Consistency Improves Chain of Thought Reasoning",
-    citation: "arXiv:2203.11171"
-  },
-  {
-    strategy: "reflexion",
-    tier: 1,
-    improvementPercent: 0.21,
-    claimCharacteristics: [
-      "iterative_refinement",
-      "self_correction",
-      "quality_improvement",
-      "code_generation"
-    ],
-    source: "MIT/Northeastern (2023) \u2014 Reflexion: Language Agents with Verbal Reinforcement Learning",
-    citation: "arXiv:2303.11366"
-  },
-  {
-    strategy: "problem_analysis",
-    tier: 1,
-    improvementPercent: 0.24,
-    claimCharacteristics: [
-      "complex_technical",
-      "multi_dimensional",
-      "structural_reasoning",
-      "risk_analysis"
-    ],
-    source: "Harvard/MIT (2024) \u2014 Structured Decomposition Outperforms Linear Reasoning",
-    citation: "Harvard/MIT 2024"
-  }
-];
-var TIER_2_EVIDENCE = [
-  {
-    strategy: "tree_of_thoughts",
-    tier: 2,
-    improvementPercent: 0.74,
-    claimCharacteristics: [
-      "exploratory_reasoning",
-      "multiple_approaches",
-      "creative_problems",
-      "branch_exploration"
-    ],
-    source: "Princeton/Google DeepMind (2024) \u2014 Tree of Thoughts: Deliberate Problem Solving with LLMs",
-    citation: "arXiv:2305.10601"
-  },
-  {
-    strategy: "react",
-    tier: 2,
-    improvementPercent: 0.27,
-    claimCharacteristics: [
-      "codebase_integration",
-      "tool_use",
-      "external_knowledge",
-      "cross_reference"
-    ],
-    source: "Princeton/Google (2023) \u2014 ReAct: Synergizing Reasoning and Acting in Language Models",
-    citation: "arXiv:2210.03629"
-  },
-  {
-    strategy: "meta_prompting",
-    tier: 2,
-    improvementPercent: 0.171,
-    claimCharacteristics: [
-      "complex_technical",
-      "multi_step_logic",
-      "role_based_reasoning",
-      "expert_orchestration"
-    ],
-    source: "Stanford (2024) \u2014 Meta-Prompting: Enhancing Language Models with Task-Agnostic Scaffolding",
-    citation: "Stanford 2024"
-  },
-  {
-    strategy: "plan_and_solve",
-    tier: 2,
-    improvementPercent: 0.058,
-    claimCharacteristics: [
-      "multi_step_logic",
-      "sequential_planning",
-      "structural_reasoning"
-    ],
-    source: "NUS (2023) \u2014 Plan-and-Solve Prompting: Improving Zero-Shot CoT",
-    citation: "arXiv:2305.04091"
-  }
-];
-var TIER_3_EVIDENCE = [
-  {
-    strategy: "few_shot",
-    tier: 3,
-    improvementPercent: 0.25,
-    claimCharacteristics: [
-      "pattern_matching",
-      "domain_specific",
-      "example_based"
-    ],
-    source: "OpenAI (2020) \u2014 Language Models are Few-Shot Learners",
-    citation: "arXiv:2005.14165"
-  },
-  {
-    strategy: "generate_knowledge",
-    tier: 3,
-    improvementPercent: 0.15,
-    claimCharacteristics: [
-      "domain_knowledge",
-      "fact_generation",
-      "commonsense_reasoning"
-    ],
-    source: "AI2 (2022) \u2014 Generated Knowledge Prompting for Commonsense Reasoning",
-    citation: "arXiv:2110.08387"
-  },
-  {
-    strategy: "multimodal_cot",
-    tier: 3,
-    improvementPercent: 0.16,
-    claimCharacteristics: [
-      "visual_reasoning",
-      "multimodal",
-      "diagram_analysis"
-    ],
-    source: "Amazon/UCLA (2023) \u2014 Multimodal Chain-of-Thought Reasoning",
-    citation: "arXiv:2302.00923"
-  }
-];
-var TIER_4_EVIDENCE = [
-  {
-    strategy: "chain_of_thought",
-    tier: 4,
-    improvementPercent: 0,
-    claimCharacteristics: ["basic_reasoning"],
-    source: "Google/DeepMind (2024) \u2014 Chain-of-Thought Reasoning Without Prompting",
-    citation: "arXiv:2402.10200"
-  },
-  {
-    strategy: "zero_shot",
-    tier: 4,
-    improvementPercent: 0,
-    claimCharacteristics: [],
-    source: "Various (2023) \u2014 Baseline comparison meta-analysis",
-    citation: "Various 2023"
-  }
-];
-var ALL_EVIDENCE = [
-  ...TIER_1_EVIDENCE,
-  ...TIER_2_EVIDENCE,
-  ...TIER_3_EVIDENCE,
-  ...TIER_4_EVIDENCE
-];
-var ResearchEvidenceDatabase = class {
-  evidence = ALL_EVIDENCE;
-  getEvidence(strategy) {
-    return this.evidence.filter((e3) => e3.strategy === strategy);
-  }
-  getBestEvidence(strategy) {
-    return this.getEvidence(strategy).sort((a, b) => b.improvementPercent - a.improvementPercent)[0];
-  }
-  getTier(strategy) {
-    const first = this.evidence.find((e3) => e3.strategy === strategy);
-    return first?.tier;
-  }
-  getStrategiesInTier(tier) {
-    const seen = /* @__PURE__ */ new Set();
-    for (const e3 of this.evidence) {
-      if (e3.tier === tier)
-        seen.add(e3.strategy);
-    }
-    return [...seen];
-  }
-  getMatchingStrategies(characteristics) {
-    const charSet = new Set(characteristics);
-    return this.evidence.filter((e3) => e3.claimCharacteristics.some((c) => charSet.has(c))).sort((a, b) => {
-      if (a.tier !== b.tier)
-        return a.tier - b.tier;
-      return b.improvementPercent - a.improvementPercent;
-    });
-  }
-  calculateScore(strategy, characteristics) {
-    const matching = this.getEvidence(strategy);
-    if (matching.length === 0)
-      return 0;
-    let totalScore = 0;
-    for (const ev of matching) {
-      const evChars = new Set(ev.claimCharacteristics);
-      let overlap = 0;
-      for (const c of characteristics) {
-        if (evChars.has(c))
-          overlap++;
-      }
-      const overlapRatio = overlap / Math.max(1, ev.claimCharacteristics.length);
-      const tierWeight = STRATEGY_TIERS[ev.tier].selectionWeight;
-      totalScore += ev.improvementPercent * tierWeight * (0.5 + 0.5 * overlapRatio);
-    }
-    return totalScore / matching.length;
-  }
-  getCitations(strategy) {
-    return this.getEvidence(strategy).map((e3) => e3.citation);
-  }
-  getAllStrategies() {
-    const seen = /* @__PURE__ */ new Set();
-    for (const e3 of this.evidence) {
-      seen.add(e3.strategy);
-    }
-    return [...seen];
-  }
-  getAllEvidence() {
-    return this.evidence;
-  }
-};
-
 // packages/strategy/dist/claim-analyzer.js
 var ClaimAnalysisResultSchema = external_exports.object({
   claim: external_exports.string(),
@@ -30803,6 +30566,9 @@ function calculateComplexityScore(characteristics, text) {
   score += Math.min(0.15, wordCount / 500);
   return Math.min(1, score);
 }
+function characteristicSet(characteristics) {
+  return new Set(characteristics);
+}
 function complexityTierFromScore(score) {
   if (score >= 0.6)
     return "complex";
@@ -30855,6 +30621,257 @@ function analyzeClaim(claim, context) {
   };
 }
 
+// packages/strategy/dist/research-evidence-database.js
+var AUTHORED_EVIDENCE = [
+  // ── Tier 1: Most Effective ──────────────────────────────────────────────────
+  {
+    strategy: "recursive_refinement",
+    improvementPercent: 0.32,
+    claimCharacteristics: [
+      "mathematical_reasoning",
+      "multi_step_logic",
+      "complex_technical",
+      "iterative_refinement",
+      "high_precision"
+    ],
+    source: "DeepSeek (2025) \u2014 DeepSeek-R1: Incentivizing Reasoning Capability in LLMs",
+    citation: "arXiv:2501.12948"
+  },
+  {
+    strategy: "recursive_refinement",
+    improvementPercent: 0.74,
+    claimCharacteristics: [
+      "mathematical_reasoning",
+      "multi_step_logic",
+      "self_correction",
+      "high_precision"
+    ],
+    source: "OpenAI (2024) \u2014 Learning to Reason with LLMs",
+    citation: "OpenAI technical report (non-peer-reviewed)"
+  },
+  {
+    strategy: "verified_reasoning",
+    improvementPercent: 0.18,
+    claimCharacteristics: [
+      "accuracy_critical",
+      "fact_verification",
+      "consistency_check",
+      "high_precision"
+    ],
+    source: "Stanford/Anthropic (2024) \u2014 Chain-of-Verification Reduces Hallucination in LLMs",
+    citation: "Stanford/Anthropic 2024"
+  },
+  {
+    strategy: "graph_of_thoughts",
+    improvementPercent: 0.62,
+    claimCharacteristics: [
+      "dependency_analysis",
+      "cross_reference",
+      "structural_reasoning",
+      "complex_technical"
+    ],
+    source: "ETH Zurich (2024) \u2014 Graph of Thoughts: Solving Elaborate Problems with LLMs",
+    citation: "arXiv:2308.09687"
+  },
+  {
+    strategy: "self_consistency",
+    improvementPercent: 0.179,
+    claimCharacteristics: [
+      "mathematical_reasoning",
+      "multiple_approaches",
+      "consistency_check",
+      "uncertainty_handling"
+    ],
+    source: "Google Research (2023) \u2014 Self-Consistency Improves Chain of Thought Reasoning",
+    citation: "arXiv:2203.11171"
+  },
+  {
+    strategy: "reflexion",
+    improvementPercent: 0.21,
+    claimCharacteristics: [
+      "iterative_refinement",
+      "self_correction",
+      "quality_improvement",
+      "code_generation"
+    ],
+    source: "MIT/Northeastern (2023) \u2014 Reflexion: Language Agents with Verbal Reinforcement Learning",
+    citation: "arXiv:2303.11366"
+  },
+  {
+    strategy: "problem_analysis",
+    improvementPercent: 0.24,
+    claimCharacteristics: [
+      "complex_technical",
+      "multi_dimensional",
+      "structural_reasoning",
+      "risk_analysis"
+    ],
+    source: "Harvard/MIT (2024) \u2014 Structured Decomposition Outperforms Linear Reasoning",
+    citation: "Harvard/MIT 2024"
+  },
+  // ── Tier 2: Effective with Context ──────────────────────────────────────────
+  {
+    strategy: "tree_of_thoughts",
+    improvementPercent: 0.74,
+    claimCharacteristics: [
+      "exploratory_reasoning",
+      "multiple_approaches",
+      "creative_problems",
+      "branch_exploration"
+    ],
+    source: "Princeton/Google DeepMind (2024) \u2014 Tree of Thoughts: Deliberate Problem Solving with LLMs",
+    citation: "arXiv:2305.10601"
+  },
+  {
+    strategy: "react",
+    improvementPercent: 0.27,
+    claimCharacteristics: [
+      "codebase_integration",
+      "tool_use",
+      "external_knowledge",
+      "cross_reference"
+    ],
+    source: "Princeton/Google (2023) \u2014 ReAct: Synergizing Reasoning and Acting in Language Models",
+    citation: "arXiv:2210.03629"
+  },
+  {
+    strategy: "meta_prompting",
+    improvementPercent: 0.171,
+    claimCharacteristics: [
+      "complex_technical",
+      "multi_step_logic",
+      "role_based_reasoning",
+      "expert_orchestration"
+    ],
+    source: "Stanford (2024) \u2014 Meta-Prompting: Enhancing Language Models with Task-Agnostic Scaffolding",
+    citation: "Stanford 2024"
+  },
+  {
+    strategy: "plan_and_solve",
+    improvementPercent: 0.058,
+    claimCharacteristics: [
+      "multi_step_logic",
+      "sequential_planning",
+      "structural_reasoning"
+    ],
+    source: "NUS (2023) \u2014 Plan-and-Solve Prompting: Improving Zero-Shot CoT",
+    citation: "arXiv:2305.04091"
+  },
+  // ── Tier 3: Specialized Use Cases ───────────────────────────────────────────
+  {
+    strategy: "few_shot",
+    improvementPercent: 0.25,
+    claimCharacteristics: [
+      "pattern_matching",
+      "domain_specific",
+      "example_based"
+    ],
+    source: "OpenAI (2020) \u2014 Language Models are Few-Shot Learners",
+    citation: "arXiv:2005.14165"
+  },
+  {
+    strategy: "generate_knowledge",
+    improvementPercent: 0.15,
+    claimCharacteristics: [
+      "domain_knowledge",
+      "fact_generation",
+      "commonsense_reasoning"
+    ],
+    source: "AI2 (2022) \u2014 Generated Knowledge Prompting for Commonsense Reasoning",
+    citation: "arXiv:2110.08387"
+  },
+  {
+    strategy: "multimodal_cot",
+    improvementPercent: 0.16,
+    claimCharacteristics: [
+      "visual_reasoning",
+      "multimodal",
+      "diagram_analysis"
+    ],
+    source: "Amazon/UCLA (2023) \u2014 Multimodal Chain-of-Thought Reasoning",
+    citation: "arXiv:2302.00923"
+  },
+  // ── Tier 4: Basic (Free Tier) ───────────────────────────────────────────────
+  {
+    strategy: "chain_of_thought",
+    improvementPercent: 0,
+    claimCharacteristics: ["basic_reasoning"],
+    source: "Google/DeepMind (2024) \u2014 Chain-of-Thought Reasoning Without Prompting",
+    citation: "arXiv:2402.10200"
+  },
+  {
+    strategy: "zero_shot",
+    improvementPercent: 0,
+    claimCharacteristics: [],
+    source: "Various (2023) \u2014 Baseline comparison meta-analysis",
+    citation: "Various 2023"
+  }
+];
+var ALL_EVIDENCE = AUTHORED_EVIDENCE.map((e3) => ({
+  ...e3,
+  tier: getStrategyTier(e3.strategy)
+}));
+var ResearchEvidenceDatabase = class {
+  evidence = ALL_EVIDENCE;
+  getEvidence(strategy) {
+    return this.evidence.filter((e3) => e3.strategy === strategy);
+  }
+  getBestEvidence(strategy) {
+    return this.getEvidence(strategy).sort((a, b) => b.improvementPercent - a.improvementPercent)[0];
+  }
+  getTier(strategy) {
+    const first = this.evidence.find((e3) => e3.strategy === strategy);
+    return first?.tier;
+  }
+  getStrategiesInTier(tier) {
+    const seen = /* @__PURE__ */ new Set();
+    for (const e3 of this.evidence) {
+      if (e3.tier === tier)
+        seen.add(e3.strategy);
+    }
+    return [...seen];
+  }
+  getMatchingStrategies(characteristics) {
+    const charSet = characteristicSet(characteristics);
+    return this.evidence.filter((e3) => e3.claimCharacteristics.some((c) => charSet.has(c))).sort((a, b) => {
+      if (a.tier !== b.tier)
+        return a.tier - b.tier;
+      return b.improvementPercent - a.improvementPercent;
+    });
+  }
+  calculateScore(strategy, characteristics) {
+    const matching = this.getEvidence(strategy);
+    if (matching.length === 0)
+      return 0;
+    let totalScore = 0;
+    for (const ev of matching) {
+      const evChars = characteristicSet(ev.claimCharacteristics);
+      let overlap = 0;
+      for (const c of characteristics) {
+        if (evChars.has(c))
+          overlap++;
+      }
+      const overlapRatio = overlap / Math.max(1, ev.claimCharacteristics.length);
+      const tierWeight = STRATEGY_TIERS[ev.tier].selectionWeight;
+      totalScore += ev.improvementPercent * tierWeight * (0.5 + 0.5 * overlapRatio);
+    }
+    return totalScore / matching.length;
+  }
+  getCitations(strategy) {
+    return this.getEvidence(strategy).map((e3) => e3.citation);
+  }
+  getAllStrategies() {
+    const seen = /* @__PURE__ */ new Set();
+    for (const e3 of this.evidence) {
+      seen.add(e3.strategy);
+    }
+    return [...seen];
+  }
+  getAllEvidence() {
+    return this.evidence;
+  }
+};
+
 // packages/strategy/dist/selector.js
 var StrategyAssignmentSchema = external_exports.object({
   required: external_exports.array(ThinkingStrategySchema),
@@ -30879,7 +30896,7 @@ function scoreStrategies(characteristics, historicalAdjustments, overlapWeight, 
     let totalOverlap = 0;
     let weightedImprovement = 0;
     for (const ev of evidence) {
-      const evChars = new Set(ev.claimCharacteristics);
+      const evChars = characteristicSet(ev.claimCharacteristics);
       let overlap = 0;
       for (const c of characteristics) {
         if (evChars.has(c))
@@ -30972,7 +30989,7 @@ function calculateAssignmentConfidence(strategies, characteristics, complexityTi
   let totalOverlap = 0;
   for (const strategy of strategies) {
     for (const ev of db.getEvidence(strategy)) {
-      const evChars = new Set(ev.claimCharacteristics);
+      const evChars = characteristicSet(ev.claimCharacteristics);
       for (const c of characteristics) {
         if (evChars.has(c))
           totalOverlap++;
@@ -35491,6 +35508,9 @@ function buildPolicyGateQuestion(verdict) {
 
 // packages/orchestration/dist/handlers/verification-report.js
 var VERIFICATION_REPORT_FILENAME = "10-verification-report.md";
+function escapeTableCell(value) {
+  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r\n|\r|\n/g, "<br>");
+}
 function runDirFromWrittenFiles(state) {
   const prd = state.written_files.find((p) => /(^|\/)01-prd\.md$/.test(p));
   if (!prd)
@@ -35527,7 +35547,7 @@ function renderJudgeVerdicts(verification) {
   }
   const header = "| Claim ID | Judge | Model | Verdict | Confidence | Rationale |";
   const sep = "|---|---|---|---|---|---|";
-  const rows = verdicts.map((v) => `| ${v.claim_id} | ${renderJudgeIdentity(v.judge)} | ${v.model ?? "\u2014"} | ${v.verdict} | ${v.confidence.toFixed(2)} | ${v.rationale.replace(/\|/g, "\\|")} |`);
+  const rows = verdicts.map((v) => `| ${escapeTableCell(v.claim_id)} | ${escapeTableCell(renderJudgeIdentity(v.judge))} | ${escapeTableCell(v.model ?? "\u2014")} | ${escapeTableCell(v.verdict)} | ${v.confidence.toFixed(2)} | ${escapeTableCell(v.rationale)} |`);
   return [header, sep, ...rows].join("\n");
 }
 function renderModelAgreementSummary(verification) {
@@ -37212,7 +37232,7 @@ function makeCannedDispatcher(opts = {}) {
         return void 0;
       default: {
         const _exhaustive = action;
-        throw new Error(`cannedDispatcher: unhandled action.kind=${action.kind}. Add a case to the dispatch switch.`);
+        throw new Error(`cannedDispatcher: unhandled action.kind=${_exhaustive.kind}. Add a case to the dispatch switch.`);
       }
     }
   };

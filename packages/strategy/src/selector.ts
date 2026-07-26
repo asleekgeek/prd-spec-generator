@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ResearchEvidenceDatabase } from "./research-evidence-database.js";
 import {
   analyzeClaim,
+  characteristicSet,
   ClaimAnalysisResultSchema,
   type ClaimAnalysisResult,
 } from "./claim-analyzer.js";
@@ -98,7 +99,7 @@ function scoreStrategies(
     let weightedImprovement = 0.0;
 
     for (const ev of evidence) {
-      const evChars = new Set(ev.claimCharacteristics);
+      const evChars = characteristicSet(ev.claimCharacteristics);
       let overlap = 0;
       for (const c of characteristics) {
         if (evChars.has(c)) overlap++;
@@ -260,7 +261,7 @@ function calculateAssignmentConfidence(
   let totalOverlap = 0;
   for (const strategy of strategies) {
     for (const ev of db.getEvidence(strategy)) {
-      const evChars = new Set(ev.claimCharacteristics);
+      const evChars = characteristicSet(ev.claimCharacteristics);
       for (const c of characteristics) {
         if (evChars.has(c)) totalOverlap++;
       }
@@ -296,6 +297,8 @@ export function selectStrategy(options: SelectorOptions): StrategyAssignment {
 
   // Step 1: Analyze claim characteristics
   const analysis = analyzeClaim(claim, context);
+  // Mutable on purpose — the context flags below are added to this set, so it
+  // cannot be the ReadonlySet that characteristicSet() returns.
   const characteristics = new Set(analysis.characteristics);
 
   // Enrich with context flags

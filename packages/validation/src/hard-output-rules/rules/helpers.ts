@@ -87,11 +87,30 @@ export function makeViolation(
  * Returns the inner content of each ```...``` block.
  */
 export function extractCodeBlocks(content: string): string[] {
-  const pattern = /```(?:\w+)?\s*\n([\s\S]*?)```/g;
+  // `\s*\n` is ambiguous: `\s` ALREADY matches `\n`, so the engine can split a
+  // run of newlines between the two in many ways, which is the polynomial
+  // backtracking CodeQL flags (js/polynomial-redos). The intent is "optional
+  // language tag, then the rest of the fence line, then the newline", so the
+  // horizontal-whitespace class says exactly that and is unambiguous.
+  //
+  // Blank lines between the fence and the first line of code must still be
+  // eaten (the original `\s*\n` ate them, and an equivalence check showed the
+  // rules see a different block without that). They are NOT eaten in the
+  // pattern, though: an in-pattern `(?:[ \t]*\r?\n)*` sitting in front of the
+  // lazy body capture is ambiguous — every blank line can belong either to
+  // that run or to the capture — and with an UNTERMINATED fence the engine
+  // re-splits the run for each failed scan to end-of-input. Measured O(n²):
+  // 1000 blank lines 0.4 ms, 2000 1.1 ms, 4000 4.1 ms, 8000 16.3 ms.
+  //
+  // Stripping them from the captured text instead is exactly equivalent
+  // (same characters removed, same order) and cannot backtrack: LEADING_BLANK
+  // is ^-anchored, applied once, to an already-extracted string.
+  const pattern = /```(?:\w+)?[ \t]*\r?\n([\s\S]*?)```/g;
+  const LEADING_BLANK = /^(?:[ \t]*\r?\n)+/;
   const blocks: string[] = [];
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(content)) !== null) {
-    blocks.push(match[1]);
+    blocks.push(match[1].replace(LEADING_BLANK, ""));
   }
   return blocks;
 }

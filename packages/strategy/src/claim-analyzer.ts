@@ -243,10 +243,19 @@ function calculateComplexityScore(
 }
 
 /**
- * Convenience: build a Set view from the array form. Used at consumer sites
- * (selector + research-evidence-database) that need set membership semantics.
+ * Build a Set view from the array form, for consumer sites that need set
+ * membership semantics.
+ *
+ * Exported because the selector and the research-evidence database both do
+ * repeated `.has()` lookups against characteristic arrays; they previously
+ * hand-rolled `new Set(...)` at four call sites (§3.3 — four concrete uses).
+ *
+ * Returns a ReadonlySet: callers that must ADD to the set (selectStrategy
+ * enriches with context flags) build their own mutable Set instead.
  */
-function characteristicSet(characteristics: readonly string[]): ReadonlySet<string> {
+export function characteristicSet(
+  characteristics: readonly string[],
+): ReadonlySet<string> {
   return new Set(characteristics);
 }
 
