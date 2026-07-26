@@ -117,7 +117,7 @@ rules:
     test_fixtures:
       should_flag:
         - section: technical_specification
-          content: "Modify the subtitle width to a fixed value in the shared component"
+          content: "Modify the subtitle width to a fixed value in each of the twelve screens"
       should_pass:
         - section: technical_specification
           content: "Add a configurable parameter with a sensible default to the shared component. The design is extensible — new callers can override without modifying shared code."

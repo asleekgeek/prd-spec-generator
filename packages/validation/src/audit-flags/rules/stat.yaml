@@ -23,7 +23,7 @@ rules:
         into: verdict_counts
       - op: ratio
         numerator_match: "PASS"
-        numerator_from: verdict_counts
+        numerator_from: verdicts
         denominator_sum: verdict_counts
         into: pass_rate
       - op: flag_if

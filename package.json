@@ -8,6 +8,7 @@
     "build": "pnpm -r --workspace-concurrency=1 build",
     "bundle": "esbuild packages/mcp-server/dist/index.js --bundle --platform=node --target=node20 --format=esm --external:better-sqlite3 --outfile=mcp-server/index.js && chmod +x mcp-server/index.js",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:external-judge": "node --test scripts/external-judge/__tests__/*.test.mjs",
     "lint": "pnpm -r --workspace-concurrency=1 run lint",
@@ -37,6 +38,7 @@
     }
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.10",
     "esbuild": "^0.28.1",
     "typescript": "^7.0.2",
     "vite": "^8.1.5",

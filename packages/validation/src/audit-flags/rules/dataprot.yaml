@@ -58,7 +58,7 @@ rules:
     mode: absence
     sections: [technical_specification, security_considerations, deployment]
     detect:
-      - pattern: '(?i)(?:no\s+pii\s+in\s+log|mask\s+in\s+log|redact\s+in\s+log|log\s+sanitiz|scrub\s+log|filter\s+sensitive|exclude\s+pii|safe\s+logging)'
+      - pattern: '(?i)(?:no\s+pii\s+in\s+log|mask(?:ed|ing)?\s+(?:in\s+)?log|redact(?:ed|ing|ion)?\b[^.\n]{0,40}\blog|log[^.\n]{0,40}\bredact|log\s+sanitiz|scrub(?:bed|bing)?\b[^.\n]{0,40}\blog|pii\s+scrub|filter\s+sensitive|exclude\s+pii|safe\s+logging)'
         description: PII log prevention content
     claim_count: per_document
     suggested_action: "Explicitly prevent PII from appearing in logs, error messages, URLs, and query parameters"
