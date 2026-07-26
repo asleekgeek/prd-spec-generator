@@ -1,9 +1,12 @@
 {
+  // Shared compiler options. Every packages/*/tsconfig.json extends this.
   "compilerOptions": {
     "target": "ES2022",
     "module": "Node16",
     "moduleResolution": "Node16",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -13,6 +16,24 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    // Explicit, because TypeScript 7 no longer picks @types/node up on its own
+    // here. Under 5.9 the compiler auto-included it from node_modules/@types;
+    // under 7.0.2 nothing from @types/node entered the program at all
+    // (`tsc --explainFiles` listed zero of its .d.ts files), which surfaced as
+    // four unrelated-looking failures in one package: `performance` unknown,
+    // the `node:fs`/`node:path`/`node:url` specifiers reported as unresolved
+    // NAMES (TS2591), and `url` missing from ImportMeta. Naming the type
+    // package removes the dependency on that auto-inclusion behaviour and is
+    // valid on both compilers.
+    //
+    // Consequence: a package that extends this file must declare @types/node
+    // itself, or tsc fails with TS2688. That is a feature — pnpm gives each
+    // package an isolated node_modules, so a package using node APIs without
+    // declaring the types was relying on hoisting. packages/core was doing
+    // exactly that and now declares it.
+    "types": [
+      "node"
+    ]
   }
 }
