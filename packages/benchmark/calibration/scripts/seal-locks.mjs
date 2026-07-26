@@ -5,8 +5,25 @@
 // source: docs/PHASE_4_PLAN.md §4.1 / §4.2 / §4.5 sealing procedure
 // source: calibrate-gates.ts:driveRuns + calibrate-gates-constants.ts seeds
 
-import { writeFileSync, readFileSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdtempSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
+
+// ─── Held-out ID side-output ────────────────────────────────────────────────
+// The sealing procedure commits only `partition_hash`; the run/claim IDs
+// themselves are the held-out half and are deliberately NOT committed. Writing
+// them to a fixed path in the shared temp dir defeated that twice over: the
+// path is world-readable, so the holdout leaks to any local user, and it is
+// predictable, so it can be pre-created as a symlink and made to overwrite a
+// file of the attacker's choosing (js/insecure-temporary-file).
+//
+// Nothing in the repo reads these files back — they exist for the operator to
+// eyeball after a seal. So keep that use, but in a directory the OS creates
+// atomically at mode 0700, and print where it went instead of hard-coding a
+// name callers have to guess.
+const heldoutOutDir = mkdtempSync(join(tmpdir(), "prd-gen-heldout-"));
+
 
 // ─── Mulberry32 — identical to calibrate-gates.ts ───
 function mulberry32(seed) {
@@ -84,11 +101,12 @@ const sealed_at = new Date().toISOString();
     "utf8",
   );
   writeFileSync(
-    "/tmp/kpigates-heldout-runids.txt",
+    join(heldoutOutDir, "kpigates-heldout-runids.txt"),
     heldout.join("\n") + "\n",
     "utf8",
   );
   console.log(`§4.5 KPI gates: partition_size=${heldout.length} hash=${partition_hash.slice(0, 16)}…`);
+  console.log(`  heldout ids -> ${join(heldoutOutDir, "kpigates-heldout-runids.txt")}`);
 }
 
 // ─── §4.2 MAX_ATTEMPTS seal ──────────────────────────────────────────────
@@ -122,7 +140,7 @@ const sealed_at = new Date().toISOString();
     "utf8",
   );
   writeFileSync(
-    "/tmp/maxattempts-heldout-runids.txt",
+    join(heldoutOutDir, "maxattempts-heldout-runids.txt"),
     heldout.join("\n") + "\n",
     "utf8",
   );
