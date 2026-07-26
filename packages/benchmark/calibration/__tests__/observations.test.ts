@@ -23,7 +23,7 @@
 import { describe, it, expect } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdirSync, readFileSync, rmSync, existsSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import {
   extractJudgeObservations,
@@ -61,8 +61,7 @@ function makeClaimTypes(
 }
 
 function makeTmpQueuePath(): string {
-  const dir = join(tmpdir(), `obs-test-${randomUUID()}`);
-  mkdirSync(dir, { recursive: true });
+  const dir = mkdtempSync(join(tmpdir(), "obs-test-"));
   return join(dir, "pending-observations.jsonl");
 }
 
@@ -441,8 +440,7 @@ describe("loadGoldenSet", () => {
   });
 
   it("parses valid JSONL and returns correct entries", () => {
-    const dir = join(tmpdir(), `golden-test-${randomUUID()}`);
-    mkdirSync(dir, { recursive: true });
+    const dir = mkdtempSync(join(tmpdir(), "golden-test-"));
     const path = join(dir, "golden.jsonl");
 
     // Write two valid lines.
@@ -464,8 +462,7 @@ describe("loadGoldenSet", () => {
   });
 
   it("skips malformed lines and loads valid ones", () => {
-    const dir = join(tmpdir(), `golden-malformed-${randomUUID()}`);
-    mkdirSync(dir, { recursive: true });
+    const dir = mkdtempSync(join(tmpdir(), "golden-malformed-"));
     const path = join(dir, "golden.jsonl");
 
     writeFileSync(

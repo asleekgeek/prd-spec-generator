@@ -16,7 +16,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
 import {
@@ -29,8 +29,7 @@ import { getRetryArmForRun, isControlArmRun } from "../calibration-seams.js";
 // ─── Fixture helpers ─────────────────────────────────────────────────────────
 
 function tmpDir(): string {
-  const dir = join(tmpdir(), "ablation-test-" + randomUUID());
-  mkdirSync(dir, { recursive: true });
+  const dir = mkdtempSync(join(tmpdir(), "ablation-test-"));
   return dir;
 }
 

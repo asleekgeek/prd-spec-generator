@@ -12,7 +12,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import {
   computeAblationComparison,
@@ -21,8 +21,7 @@ import {
 } from "../ablation-comparison.js";
 
 function tmpDir(): string {
-  const dir = join(tmpdir(), "seal-test-" + randomUUID());
-  mkdirSync(dir, { recursive: true });
+  const dir = mkdtempSync(join(tmpdir(), "seal-test-"));
   return dir;
 }
 

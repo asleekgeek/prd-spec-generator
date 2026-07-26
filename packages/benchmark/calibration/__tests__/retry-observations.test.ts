@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -311,8 +311,7 @@ describe("appendRetryObservationLog", () => {
   let logPath: string;
 
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `retry-obs-test-${Date.now()}`);
-    mkdirSync(tmpDir, { recursive: true });
+    tmpDir = mkdtempSync(join(tmpdir(), "retry-obs-test-"));
     logPath = join(tmpDir, "retry-observation-log.jsonl");
   });
 

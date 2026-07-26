@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -78,8 +78,7 @@ describe("verifyMaxAttemptsHeldoutSeal — B4 MaxAttempts schema", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `max-attempts-seal-test-${Date.now()}`);
-    mkdirSync(tmpDir, { recursive: true });
+    tmpDir = mkdtempSync(join(tmpdir(), "max-attempts-seal-test-"));
   });
 
   afterEach(() => {
@@ -187,8 +186,7 @@ describe("verifyReliabilityHeldoutSeal — B4", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `reliability-seal-test-${Date.now()}`);
-    mkdirSync(tmpDir, { recursive: true });
+    tmpDir = mkdtempSync(join(tmpdir(), "reliability-seal-test-"));
   });
 
   afterEach(() => {
@@ -260,8 +258,7 @@ describe("verifyKpiGatesHeldoutSeal — B4", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `kpigates-seal-test-${Date.now()}`);
-    mkdirSync(tmpDir, { recursive: true });
+    tmpDir = mkdtempSync(join(tmpdir(), "kpigates-seal-test-"));
   });
 
   afterEach(() => {
