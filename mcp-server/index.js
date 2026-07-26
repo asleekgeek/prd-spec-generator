@@ -24647,7 +24647,7 @@ function checkMetricsDisclaimer(content, sectionType) {
   return [];
 }
 function checkHonestVerificationVerdicts(content, sectionType) {
-  const nfrPattern = /NFR-\d+|(?:p95|p99|latency|throughput|response\s+time)\s*[:<≤<=]\s*\d+/gi;
+  const nfrPattern = /NFR-\d+|(?:p95|p99|latency|throughput|response\s+time)\s*(?:[:≤=]|<=?)\s*\d+/gi;
   if (!nfrPattern.test(content))
     return [];
   const verdictPattern = /\b(?:PASS|SPEC-COMPLETE|NEEDS-RUNTIME|INCONCLUSIVE|FAIL)\b/gi;
@@ -24922,7 +24922,21 @@ function checkTestTraceabilityIntegrity(content, sectionType) {
     /fn\s+(test\w+)\s*\(/g,
     // Bash implicit-function form: test_xxx() { ... } / test_xxx () { ... }
     // (optional space before both the parens and the opening brace)
-    /(test\w+)\s*\(\s*\)\s*\{/g,
+    //
+    // `\b` is load-bearing, not decoration. This is the only pattern here with
+    // no keyword prefix to anchor it, so without a boundary the engine restarts
+    // at every embedded "test" and re-scans the identifier run from each one.
+    // Measured on `"test".repeat(n)`: 2000 → 8.0 ms, 4000 → 30.8 ms,
+    // 8000 → 122.4 ms, 16000 → 488.2 ms — quadratic (js/polynomial-redos).
+    // A boundary cannot occur inside a run of word characters, so the restarts
+    // collapse: flat at ≤0.1 ms across the same range.
+    //
+    // It also tightens the rule. `mytest_foo() {` used to register `test_foo`
+    // as defined, so a matrix row naming `test_foo` passed traceability against
+    // a function that is not it. Differential check over 65,290 lines of this
+    // repo found 0 names that only the old form matched, so nothing real is
+    // lost by requiring the boundary.
+    /\b(test\w+)\s*\(\s*\)\s*\{/g,
     // Bash explicit "function" form without parens: function test_xxx { ... }
     /function\s+(test\w+)\s*\{/g
   ];
@@ -25065,7 +25079,7 @@ function checkNoNestedTypes(content, sectionType) {
   const codeBlocks = extractCodeBlocks(content);
   if (codeBlocks.length === 0)
     return [];
-  const typeKeywordPattern = /(?:^|\n)\s*(?:public\s+|private\s+|internal\s+|protected\s+|open\s+|fileprivate\s+|final\s+|abstract\s+|sealed\s+|data\s+)*(?:struct|class|enum|interface|object|record)\s+\w+/;
+  const typeKeywordPattern = /^\s*(?:public\s+|private\s+|internal\s+|protected\s+|open\s+|fileprivate\s+|final\s+|abstract\s+|sealed\s+|data\s+)*(?:struct|class|enum|interface|object|record)\s+\w+/;
   const violations = [];
   for (const codeBlock of codeBlocks) {
     const lines = codeBlock.split("\n");
@@ -25102,7 +25116,7 @@ function checkSingleResponsibility(content, sectionType) {
     violations.push(makeViolation("single_responsibility", sectionType, "Technical spec must establish single responsibility constraints \u2014 classes should have one reason to change, with clear separation of concerns."));
   }
   const codeBlocks = extractCodeBlocks(content);
-  const typeStartPattern = /(?:public\s+|private\s+|internal\s+|protected\s+|open\s+|final\s+|abstract\s+|sealed\s+|data\s+)*(?:struct|class|enum|interface|object)\s+(\w+)/;
+  const typeStartPattern = /(?:struct|class|enum|interface|object)\s+(\w+)/;
   for (const codeBlock of codeBlocks) {
     const lines = codeBlock.split("\n");
     let currentTypeName = null;
