@@ -17,7 +17,7 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import {
-  mkdirSync,
+  mkdtempSync,
   rmSync,
   writeFileSync,
   readFileSync,
@@ -37,26 +37,25 @@ import { computeGateStats, percentile } from "../gate-stats.js";
 import { measureEventRate } from "../event-rate.js";
 import { KPI_GATES, type PipelineKpis } from "../../src/pipeline-kpis.js";
 
-const TMP_DIR_PREFIX = join(
-  tmpdir(),
-  `calib-gates-test-${process.pid}-${Date.now()}`,
-);
-let tmpCounter = 0;
+// `mkdtempSync`, not a name built from pid+timestamp+counter: a composed name
+// is PREDICTABLE, so between the `mkdirSync` and the first `writeFileSync`
+// another process could win the path (js/insecure-temporary-file). mkdtemp
+// asks the OS for a fresh directory and creates it atomically with 0o700, so
+// there is no window and no name to guess. It also makes the isolation real
+// rather than assumed — two concurrent runs of this file cannot collide.
+const createdTmpDirs: string[] = [];
 function freshTmpDir(): string {
-  const dir = `${TMP_DIR_PREFIX}-${tmpCounter++}`;
-  mkdirSync(dir, { recursive: true });
+  const dir = mkdtempSync(join(tmpdir(), "calib-gates-test-"));
+  createdTmpDirs.push(dir);
   return dir;
 }
 
 afterEach(() => {
-  // Cleanup stays soft-fail: if a test already removed its dir, skip.
-  for (let i = 0; i < tmpCounter; i++) {
-    const dir = `${TMP_DIR_PREFIX}-${i}`;
-    try {
-      rmSync(dir, { recursive: true, force: true });
-    } catch {
-      /* ignore */
-    }
+  // `force: true` already makes an absent path a no-op — a test that removed
+  // its own dir needs no special case — so a swallowed catch here would only
+  // hide a real failure to clean up.
+  while (createdTmpDirs.length > 0) {
+    rmSync(createdTmpDirs.pop()!, { recursive: true, force: true });
   }
 });
 
