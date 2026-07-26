@@ -10,6 +10,6 @@
     "ajv-formats": "^3.0.1"
   },
   "optionalDependencies": {
-    "better-sqlite3": "^11.7.0"
+    "better-sqlite3": "^12.11.1"
   }
 }
