@@ -392,3 +392,69 @@ describe("implementation_gate — policy-shaped gate (needs_attention)", () => {
     expect(advanced.state.current_step).toBe("finalize");
   });
 });
+
+/**
+ * stateAtGateWithExportedPrd() carrying ONE verdict whose free-text fields
+ * are hostile to a GFM table. Judge rationales are LLM-generated, so they are
+ * untrusted input to the renderer (§13.1 D2). Module scope keeps the describe
+ * below under the §4.2 50-line function cap.
+ */
+function stateAtGateWithHostileRationale(): PipelineState {
+  return {
+    ...stateAtGateWithExportedPrd(),
+    pending_completion: {
+      summary: "Self-check complete.",
+      artifacts: ["overview: passed"],
+      verification: {
+        claims_evaluated: 1,
+        distribution: { PASS: 1 },
+        distribution_suspicious: false,
+        judge_verdicts: [
+          {
+            judge: { kind: "genius", name: "dijkstra" },
+            claim_id: "FR-001",
+            verdict: "PASS",
+            // A trailing backslash before a pipe, plus a newline: the two
+            // shapes that escape a naive `.replace(/\|/g, "\\|")`.
+            rationale: "escaped\\|pipe then\nnewline and a raw | pipe",
+            caveats: [],
+            confidence: 0.9,
+          },
+        ],
+      },
+    },
+  };
+}
+
+describe("implementation_gate — judge rationale cannot break out of its table cell", () => {
+  it("escapes backslash before pipe and neutralizes newlines (js/incomplete-sanitization)", () => {
+    // Precondition: a rationale containing `\|`, a newline, and a bare `|`.
+    // Postcondition: the verdict row is exactly ONE line whose cell count is
+    //   the header's (6 columns => 7 pipe-delimited fields), i.e. no column
+    //   or row injection. Regression: pre-fix, `escaped\|pipe` rendered as
+    //   `escaped\\|pipe` (literal backslash + UNESCAPED delimiter) and the
+    //   newline split the row in two.
+    const seed = stateAtGateWithHostileRationale();
+    const written = step({ state: seed });
+    expect(written.action.kind).toBe("write_file");
+    if (written.action.kind !== "write_file") return;
+
+    const rows = written.action.content
+      .split("\n")
+      .filter((l) => l.startsWith("| FR-001 "));
+    expect(rows).toHaveLength(1);
+
+    // Count only UNESCAPED pipes — the ones GFM treats as cell delimiters.
+    const delimiters = (rows[0].match(/(?<!\\)\|/g) ?? []).length;
+    const headerLine = written.action.content
+      .split("\n")
+      .find((l) => l.startsWith("| Claim ID |"));
+    expect(headerLine).toBeDefined();
+    const headerDelimiters = (headerLine!.match(/(?<!\\)\|/g) ?? []).length;
+    expect(delimiters).toBe(headerDelimiters);
+
+    // The newline became a GFM in-cell break, not a row terminator.
+    expect(rows[0]).toContain("<br>");
+    expect(rows[0]).not.toContain("\n");
+  });
+});

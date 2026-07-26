@@ -16,6 +16,35 @@ import { evaluatePolicy, resolveVerificationPolicy } from "./verification-policy
 const VERIFICATION_REPORT_FILENAME = "10-verification-report.md";
 
 /**
+ * Escape one GFM table cell so untrusted text cannot break out of it.
+ *
+ * Judge rationales are LLM-generated (§13.1 D2: treat as untrusted), so a
+ * cell must survive three shapes that a naive `.replace(/\|/g, "\\|")` lets
+ * through:
+ *
+ *   1. `a\|b`   — escaping the pipe WITHOUT first escaping the backslash
+ *                 yields `a\\|b`, which GFM renders as a literal backslash
+ *                 followed by an *unescaped* delimiter → column injection.
+ *                 Order matters: backslash first, then pipe.
+ *   2. newlines — a raw `\n` terminates the table row → row injection.
+ *                 Rendered as `<br>`, the GFM-sanctioned in-cell line break.
+ *   3. `\r`     — CRLF input would otherwise leave a stray CR in the cell.
+ *
+ * postcondition: the result contains no unescaped `|` and no line terminator,
+ *   so it always occupies exactly one cell of one row.
+ *
+ * source: GitHub Flavored Markdown spec §4.10 (tables) — "include a pipe in a
+ *   cell's content by escaping it, including inside other inline spans".
+ * source: CodeQL js/incomplete-sanitization (backslash must be escaped first).
+ */
+function escapeTableCell(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|")
+    .replace(/\r\n|\r|\n/g, "<br>");
+}
+
+/**
  * precondition:  `state.written_files` contains at least one exported file
  *                (file_export has run) whose path ends in the 01-prd.md
  *                slug so the report lands in the same run directory.
@@ -102,7 +131,7 @@ function renderJudgeVerdicts(
   const sep = "|---|---|---|---|---|---|";
   const rows = verdicts.map(
     (v) =>
-      `| ${v.claim_id} | ${renderJudgeIdentity(v.judge)} | ${v.model ?? "—"} | ${v.verdict} | ${v.confidence.toFixed(2)} | ${v.rationale.replace(/\|/g, "\\|")} |`,
+      `| ${escapeTableCell(v.claim_id)} | ${escapeTableCell(renderJudgeIdentity(v.judge))} | ${escapeTableCell(v.model ?? "—")} | ${escapeTableCell(v.verdict)} | ${v.confidence.toFixed(2)} | ${escapeTableCell(v.rationale)} |`,
   );
   return [header, sep, ...rows].join("\n");
 }
