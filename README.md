@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Packages-10-orange" alt="10 packages">
   <img src="https://img.shields.io/badge/MCP_Tools-17-8A2BE2" alt="17 MCP tools">
   <img src="https://img.shields.io/badge/Validators-Hard_Output_Rules-red" alt="Hard Output Rules">
-  <img src="https://img.shields.io/badge/Phase_4-Closed_Loop_Calibration-success" alt="Phase 4 closed-loop calibration shipped">
+  <img src="https://img.shields.io/badge/Calibration-Closed_Loop-success" alt="Closed-loop reliability calibration">
 </p>
 
 <p align="center">
@@ -30,15 +30,15 @@
 
 Every AI agent that drafts a PRD eventually invents a function that doesn't exist, claims latency it can't measure, or writes acceptance criteria that don't tie back to the requirements they're supposed to test. The output sounds confident. It is not actionable. The next stage in the pipeline — code generation, ticket import, sprint planning — silently inherits the hallucination, ships it, and pays for it later.
 
-**prd-spec-generator** is a TypeScript MCP server that fixes this at the structural level. The pipeline is a stateless reducer (`step(state, result?) → next_state, action`) driven by a host (Claude Code or any MCP-speaking agent). Sections are produced one at a time, validated by deterministic Hard Output Rules before the host ever sees them, and every load-bearing claim is judged by a panel of genius reasoning agents drawn from `zetetic-team-subagents` against the codebase graph from `automatised-pipeline`. **Phase 4** then closes the loop: per-judge reliability is calibrated from history, retry budgets are derived from survival statistics, KPI gates are tuned against frozen baselines, and held-out partitions are mechanically sealed so no calibration result can be peeked at before evaluation.
+**prd-spec-generator** is a TypeScript MCP server that fixes this at the structural level. The pipeline is a stateless reducer (`step(state, result?) → next_state, action`) driven by a host (Claude Code or any MCP-speaking agent). Sections are produced one at a time, validated by deterministic Hard Output Rules before the host ever sees them, and every load-bearing claim is judged by a panel of genius reasoning agents drawn from `zetetic-team-subagents` against the codebase graph from `automatised-pipeline`. The loop is closed: per-judge reliability is calibrated from history, retry budgets are derived from survival statistics, KPI gates are tuned against frozen baselines, and held-out partitions are mechanically sealed so no calibration result can be peeked at before evaluation.
 
 **10 packages. 17 MCP tools. 20 pipeline steps (11 PRD generation + 9 opt-in implementation). Multi-judge verification with consensus. Closed-loop calibration with externally-grounded falsifiers. 962 tests. Every numeric constant traces to a citation, a benchmark, or a `// source: provisional heuristic` admission.**
 
 ---
 
-## Phase 4 — closed-loop reliability calibration (shipped)
+## Closed-loop reliability calibration
 
-The verification subsystem is no longer a one-shot pass/fail report. Every claim resolution can flush an observation back to a calibration repository, every consensus run can pull calibrated posteriors from history, and every closed loop runs an external control arm so the calibration's effect is *measured*, not assumed.
+Verification is not a one-shot pass/fail report. Every claim resolution can flush an observation back to a calibration repository, every consensus run can pull calibrated posteriors from history, and every closed loop runs an external control arm so the calibration's effect is *measured*, not assumed.
 
 - **Per-judge Bayesian reliability calibration** — Beta(7,3) prior with sensitivity / specificity split per `claim_type`. Posteriors stored in a SQLite-backed `ReliabilityRepository`; observations flushed on every claim resolution.
 - **MAX_ATTEMPTS retry calibration** — Kaplan-Meier survival math (`kmEstimate` / `kmMedianAttempts` / `logRankTest` with Greenwood + Brookmeyer-Crowley CIs); Schoenfeld sample-size derivation event-rate-corrected to ~519 (was 823) against the measured `event_rate=0.4762`, CP CI `[0.4456, 0.5069]`.
@@ -245,7 +245,7 @@ The reducer produces twenty sequential steps: eleven PRD-generation steps, then 
 | **7** | `budget` | Per-section retrieval/generation token allocation via Cortex paper's 60/30/10 split |
 | **8** | `section_generation` | One section at a time: Cortex recall → engineer draft → validate → (retry up to 3) |
 | **9** | `jira_generation` | Synthesises JIRA tickets from requirements + user_stories + acceptance_criteria |
-| **10** | `file_export` | Writes 9 files (6 core + 3 companion) per SKILL.md Phase 4 |
+| **10** | `file_export` | Writes 9 files (6 core + 3 companion) per SKILL.md |
 | **11** | `self_check` | Two-phase multi-judge verification (see below); typed `verification` field on `done` |
 
 Steps 12–20 are the opt-in post-specs implementation loop: `implementation_gate` (human gate — "Implement" vs "PRD only"; also writes `10-verification-report.md`) → `pre_impl_grounding` → `implementation` (engineer subagent in an isolated worktree) → `post_impl_verification` (index → detect changes → semantic diff → security gates) → `testing` → `review` (a FAIL verdict retries `implementation` on the same worktree, bounded by `REVIEW_RETRY_CAP`) → `pr_gate` (mandatory human gate before any push) → `pr_creation` → `finalize`. Answering "PRD only" at `implementation_gate` skips straight to `finalize`; `complete` is the terminal marker, not a step.
@@ -324,7 +324,7 @@ The verdict taxonomy is deliberately five-level — not binary. NFR claims (late
 
 ## Calibration & falsification
 
-The verification subsystem is itself a hypothesis: that *consensus weighted by historically-calibrated reliability* outperforms *consensus weighted by a uniform prior*. Phase 4 is the closed loop that tests it.
+The verification subsystem is itself a hypothesis: that *consensus weighted by historically-calibrated reliability* outperforms *consensus weighted by a uniform prior*. The closed loop below is what tests it.
 
 1. **Observe.** Each verification run can flush per-judge observations (claim_id, claim_type, judge_id, verdict, oracle_truth?) to a SQLite reliability repository. Observations carry an `external_grounding` field that propagates from `Claim` through the orchestrator to the oracle resolution path; when an external oracle (Ajv schema, mathjs, `tsc`, `validateSection`) can resolve the claim, its truth replaces LLM-only consensus.
 2. **Calibrate.** On subsequent runs, calibrated posteriors weight consensus per judge, per `claim_type`. A 20% control-arm partition is forced-explored using the prior (`getReliabilityForRun` / `getRetryArmForRun` decide which arm a given run lands in deterministically from `run_id`). Without the control arm, calibration-on-calibration looks like progress whether or not it actually is.
@@ -332,7 +332,7 @@ The verification subsystem is itself a hypothesis: that *consensus weighted by h
 4. **Seal.** Held-out partitions are committed to lock files (`maxattempts-heldout.lock.json` for §4.2, `kpigates-heldout.lock.json` for §4.5, `heldout-partition.lock.json` for the §4.1 50-claim externally-grounded corpus) with a sha256 hash of the partition. The cross-arm metric functions accept a `SEAL_VERIFIED` typeof sentinel as a parameter; the only way to obtain that sentinel is to verify the seal first. Peeking at a held-out partition before evaluation is a type error.
 5. **Ground.** Where an external oracle can resolve a claim deterministically, it does. Where it cannot, `OracleUnavailableError` is thrown rather than fabricating a stub-mode truth. This is the line that breaks annotator-circularity: judges trained against (or biased toward) LLM-style reasoning cannot poison calibration that uses non-LLM truth.
 
-The lock files, the seal-verification dance, and the control-arm partition together mean: when a Phase 4 cross-arm comparison says "calibrated_helps with 95% CI excluding zero," the claim is *measured*, not vibes-checked. When it says "inconclusive_underpowered," that is also a falsifiable claim — you need more data, not more confidence.
+The lock files, the seal-verification dance, and the control-arm partition together mean: when a cross-arm comparison says "calibrated_helps with 95% CI excluding zero," the claim is *measured*, not vibes-checked. When it says "inconclusive_underpowered," that is also a falsifiable claim — you need more data, not more confidence.
 
 ---
 
@@ -369,7 +369,7 @@ mcp-server        ← composition root; 17 tools registered;
                     │  evidence repository (better-sqlite3, optional)
                     ▼
 benchmark         ← pipeline KPI measurements + golden-fixture HOR scoring
-                    │  + calibration/ subtree (Phase 4):
+                    │  + calibration/ subtree:
                     │    · ReliabilityRepository (SQLite, observation flush)
                     │    · Kaplan-Meier + log-rank + Schoenfeld N
                     │    · Clopper-Pearson exact CI + XmR control charts
@@ -386,7 +386,7 @@ skill             ← SKILL.md + slash-command definitions for Claude Code
 
 Every package's `package.json` is checked: `core` depends only on `zod`; `verification` depends only on `core`; `orchestration` depends on `core`/`validation`/`verification`/`meta-prompting` (NOT on `ecosystem-adapters`); `ecosystem-adapters` depends on `core` + `verification`; `mcp-server` is the only place where everything composes.
 
-The Phase 3+4 cross-audit found and fixed two layer violations:
+A cross-audit found and fixed two layer violations:
 - `orchestration` was importing `extractJsonObject` and `buildJudgePrompt` from `ecosystem-adapters` — pure utilities lived in the wrong package; moved to `core` and `verification` respectively.
 - Pure domain types (`Claim`, `JudgeVerdict`, `JudgeRequest`, `AgentIdentity`) lived in `ecosystem-adapters/contracts/subagent.ts`; moved to `core/domain/agent.ts`. The infrastructure package now re-exports them as a backward-compat shim.
 
@@ -460,16 +460,16 @@ const KPI_GATES = {
   /** source: provisional heuristic. Smoke baseline = 62 iterations on
    *  trial+codebase; cap is 100 (~60% headroom). dijkstra cross-audit
    *  derived a structural max of 9 emit_message hops; the substantive-
-   *  action count builds on that. Phase 4.5 will replace with measured
-   *  P95 + 1σ. */
+   *  action count builds on that. Replace with measured P95 + 1σ once
+   *  the calibrated baseline has enough runs. */
   iteration_count_max: 100,
   ...
 };
 
 // verification/consensus.ts
 /** source: provisional heuristic — Beta(7,3) (mean 0.7, ESS=10,
- *  moderately informative toward reliability). Phase 4.1 will replace
- *  with per-agent Beta(α+correct, β+incorrect) calibrated from history. */
+ *  moderately informative toward reliability). Replaced per agent by
+ *  Beta(α+correct, β+incorrect) once calibrated from history. */
 const DEFAULT_RELIABILITY_PRIOR_MEAN = 0.7;
 ```
 
@@ -484,7 +484,7 @@ The same standard applied to itself.
 1. **The PRD pipeline does not write code — and the server itself never does.** Steps 1–11 produce a PRD; symbols in the PRD are validated against the graph but never edited by us. The opt-in implementation loop (steps 12–20) runs only when a human answers "Implement" at `implementation_gate`; there, the host's engineer/test-engineer/code-reviewer subagents write, test, and review the implementation in an isolated worktree, and nothing is pushed or turned into a PR without the mandatory `pr_gate` approval. This server only emits `spawn_subagents` actions — it never edits source files or pushes branches itself.
 2. **It does not validate prose quality.** Hard Output Rules check structural invariants (FR numbering, AC traceability, NFR shape, cross-references). They do not check whether a sentence is well-written or persuasive. That is what the multi-judge phase is for, and even there the judges return verdicts on *claims* — atomic assertions — not on style.
 3. **The judge phase is end-to-end testable but the judges are not deterministic.** In tests we use a canned dispatcher that returns 100% PASS by construction; the `distribution_suspicious` detector exists precisely because real judge panels can also degenerate into confirmatory consensus, and we do not pretend otherwise.
-4. **The KPI gates were provisional; Phase 4.5 has shipped.** `iteration_count_max`, `wall_time_ms_max`, and `mean_section_attempts_max` were originally canned-dispatcher baselines. They are now calibrated against the K=100 frozen baseline with Clopper-Pearson exact CIs, per-machine-class wall_time normalization, and `loadCalibratedGates` + `hold_provisional` ratchet protection. The §4.5 lock file commits a content-hash of the baseline; mutating it post hoc fails the seal verification. Where data is still thin, gates remain `hold_provisional` rather than locked. See [docs/PHASE_4_PLAN.md](docs/PHASE_4_PLAN.md) for the full pre-registration.
+4. **The KPI gates are calibrated, not hand-picked.** `iteration_count_max`, `wall_time_ms_max`, and `mean_section_attempts_max` are calibrated against the K=100 frozen baseline with Clopper-Pearson exact CIs, per-machine-class wall_time normalization, and `loadCalibratedGates` + `hold_provisional` ratchet protection. The lock file commits a content-hash of the baseline; mutating it post hoc fails the seal verification. Where data is still thin, gates remain `hold_provisional` rather than locked. See [docs/PHASE_4_PLAN.md](docs/PHASE_4_PLAN.md) for the full pre-registration.
 5. **Citation presence ≠ citation validity.** A `// source: Knuth 1998` comment satisfies the convention whether or not Knuth 1998 exists or supports the value. We enforce that the citation IS THERE; the cross-audit cycle (genius + team review every phase) is what keeps it honest.
 
 ---
@@ -504,7 +504,7 @@ The repo ships a multi-agent cross-audit workflow. After every non-trivial phase
 #   poincare (qualitative), ...
 ```
 
-Each agent reads the current state of the code (not from memory) and produces a ranked finding list. The Phase 3+4 cycle generated 30 findings; 28 were closed in the same cycle (4 CRIT + 13 HIGH + 11 MED). Two are deferred to Phase 4 calibration with the evidence required to close them documented in docs/PHASE_4_PLAN.md.
+Each agent reads the current state of the code (not from memory) and produces a ranked finding list, severity-ranked. Findings are closed in the cycle that raised them; anything that cannot be closed without new measurement is carried with the evidence required to close it written down, so a deferral is a stated obligation rather than a silence.
 
 ---
 
@@ -521,7 +521,7 @@ packages/
 ├── ecosystem-adapters/    StdioMcpClient · AutomatisedPipelineClient · CortexClient
 ├── mcp-server/            Composition root · 17 MCP tools registered
 ├── benchmark/             Pipeline KPI measurement · golden-fixture HOR scoring
-│   └── calibration/       Phase 4: ReliabilityRepository · KM survival ·
+│   └── calibration/       ReliabilityRepository · KM survival ·
 │                          Clopper-Pearson · XmR · paired-bootstrap ·
 │                          external oracles · sealed held-out partitions ·
 │                          production-mode dispatcher
