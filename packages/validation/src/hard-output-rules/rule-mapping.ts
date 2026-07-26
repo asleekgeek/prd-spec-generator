@@ -141,13 +141,31 @@ export function rulesForSection(sectionType: SectionType): HardOutputRule[] {
   return [...SECTION_RULES[sectionType]];
 }
 
-/** Rules that must be validated across the entire document (cross-section). */
-export const DOCUMENT_LEVEL_RULES: readonly HardOutputRule[] = [
+/**
+ * Rules that must be validated across the entire document (cross-section).
+ *
+ * This list DRIVES `validateDocument`'s cross-section pass: every member must
+ * have an entry in DOCUMENT_LEVEL_CHECKS (hard-output-rules/index.ts), which
+ * is a total Record over this tuple. A rule declared here without a checker is
+ * a compile error, and adding one requires no edit to the dispatch loop
+ * (coding-standards §1.2 OCP).
+ *
+ * `no_self_referencing_deps` is deliberately ABSENT: it is a section rule
+ * (mapped above for requirements / user_stories / timeline). Both of its
+ * patterns are line-anchored — the prose pattern forbids `\n` between the two
+ * ID occurrences and the table pattern is `^…` under /gm — so joining sections
+ * cannot surface a violation the per-section pass missed. Cross-section
+ * dependency CYCLES are a different property, covered by
+ * validateCrossReferences (`cycles`), not by this rule.
+ */
+export const DOCUMENT_LEVEL_RULES = [
   "sp_arithmetic",
   "ac_numbering",
-  "no_self_referencing_deps",
   "honest_verification_verdicts",
   "test_traceability_integrity",
   "fr_to_ac_coverage",
   "ac_to_test_coverage",
-];
+] as const satisfies readonly HardOutputRule[];
+
+/** A rule carried by DOCUMENT_LEVEL_RULES. */
+export type DocumentLevelRule = (typeof DOCUMENT_LEVEL_RULES)[number];

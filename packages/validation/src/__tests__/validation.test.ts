@@ -10,7 +10,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { validateSection, validateDocument } from "../index.js";
+import {
+  validateSection,
+  validateDocument,
+  DOCUMENT_LEVEL_RULES,
+} from "../index.js";
 import {
   HardOutputRuleSchema,
   isCriticalRule,
@@ -36,6 +40,51 @@ describe("isCriticalRule + scorePenalty + isDeterministicRule contracts", () => 
     expect(isDeterministicRule("fr_numbering_gaps")).toBe(true);
     expect(isDeterministicRule("ac_numbering")).toBe(true);
     expect(isDeterministicRule("clean_architecture")).toBe(true);
+  });
+});
+
+describe("DOCUMENT_LEVEL_RULES drives the cross-section pass", () => {
+  /**
+   * DOCUMENT_LEVEL_RULES declared 7 rules while validateDocument hand-called
+   * 6; nothing caught the drift because the constant had no consumer. The
+   * list now drives the dispatch, so every declared rule MUST be checked.
+   *
+   * The fixture uses only sections whose SECTION_RULES entry is empty
+   * (`overview`, `goals`). Any rule appearing in rulesChecked therefore came
+   * from the document-level pass, not from a section-level pass — which is
+   * what makes this test able to fail on the drift it pins.
+   */
+  const RULE_FREE_SECTIONS = [
+    { type: "overview" as const, content: "## Overview\n\nA short overview." },
+    { type: "goals" as const, content: "## Goals\n\n- Ship the thing." },
+  ];
+
+  it("checks EVERY declared document-level rule", () => {
+    const report = validateDocument(RULE_FREE_SECTIONS);
+    const checked = new Set(report.rulesChecked);
+    for (const rule of DOCUMENT_LEVEL_RULES) {
+      expect(checked.has(rule)).toBe(true);
+    }
+  });
+
+  it("checks NOTHING BUT the declared document-level rules on rule-free sections", () => {
+    const report = validateDocument(RULE_FREE_SECTIONS);
+    expect([...report.rulesChecked].sort()).toEqual(
+      [...DOCUMENT_LEVEL_RULES].sort(),
+    );
+  });
+
+  it("does not declare a rule it cannot run (no_self_referencing_deps is section-level)", () => {
+    expect(DOCUMENT_LEVEL_RULES).not.toContain("no_self_referencing_deps");
+    // …and it is still enforced where it belongs.
+    const section = validateSection(
+      "## User Stories\n\n- STORY-1 depends on STORY-1.",
+      "user_stories",
+    );
+    expect(section.rulesChecked).toContain("no_self_referencing_deps");
+    expect(
+      section.violations.some((v) => v.rule === "no_self_referencing_deps"),
+    ).toBe(true);
   });
 });
 

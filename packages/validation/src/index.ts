@@ -1,6 +1,12 @@
 // Validation engine — 64 HOR rules + audit flags + cross-ref graph
 
-export { validateSection, validateDocument } from "./hard-output-rules/index.js";
+export {
+  validateSection,
+  validateDocument,
+  rulesForSection,
+  DOCUMENT_LEVEL_RULES,
+  type DocumentLevelRule,
+} from "./hard-output-rules/index.js";
 export { validateCrossReferences } from "./cross-ref-validator.js";
 export {
   AuditFlagEngine,

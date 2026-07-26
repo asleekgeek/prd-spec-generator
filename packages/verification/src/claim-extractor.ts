@@ -10,7 +10,9 @@
 
 import type { SectionType, Claim } from "@prd-gen/core";
 
-type ClaimType = Claim["claim_type"];
+// No local ClaimType alias: every extractor accumulates into `const claims:
+// Claim[]`, so TypeScript already checks each `claim_type` literal against
+// the union at the push site.
 
 interface ExtractContext {
   readonly section_type: SectionType;

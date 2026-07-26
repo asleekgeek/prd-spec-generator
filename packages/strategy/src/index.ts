@@ -14,6 +14,7 @@ export {
 
 export {
   analyzeClaim,
+  characteristicSet,
   ClaimAnalysisResultSchema,
   type ClaimAnalysisResult,
 } from "./claim-analyzer.js";
