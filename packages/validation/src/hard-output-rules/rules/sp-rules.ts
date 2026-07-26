@@ -2,20 +2,54 @@ import type {
   HardOutputRuleViolation,
   SectionType,
 } from "@prd-gen/core";
-import { findPatternViolations, makeViolation } from "./helpers.js";
+import { makeViolation } from "./helpers.js";
+
+/** A line is a table row when its first non-indent character is `|`. */
+const TABLE_ROW_START = /^[ \t]*\|/;
+/** A cell names the SP column. Horizontal space only — a cell cannot wrap. */
+const SP_CELL = /Story[ \t]*Points?/i;
 
 // Rule 8: SP Not In FR Table
 export function checkSPNotInFRTable(
   content: string,
   sectionType: SectionType,
 ): HardOutputRuleViolation[] {
-  return findPatternViolations(
-    /^\s*\|(?:[^|]*\|)*[^|]*(?:Story\s*Points?)[^|]*\|/gim,
-    content,
-    "sp_not_in_fr_table",
-    sectionType,
-    "FR table contains Story Points column — SP belongs only in Implementation Roadmap",
-  );
+  // Was one regex: `^\s*\|(?:[^|]*\|)*[^|]*(?:Story\s*Points?)[^|]*\|`.
+  //
+  // It was quadratic (js/polynomial-redos). On a single row whose cell holds
+  // many near-misses of the literal, `[^|]*(?:Story\s*Points?)` offers a
+  // candidate at each one and the trailing `[^|]*\|` rescans to end-of-input
+  // for every candidate. Measured 3.94x, 3.99x, 4.02x per doubling
+  // (41 ms at 22 KB, 2.6 s at 176 KB) — textbook O(n²).
+  //
+  // No line-scoped regex fixes it: the rescan is WITHIN one row, so narrowing
+  // the classes to `[^|\n]` still measured 3.86x–4.07x per doubling. The
+  // rescan has to go, which means the cell boundary must be found once rather
+  // than re-derived per candidate — hence the split, exactly the restructure
+  // `checkUnevenSPDistribution` below already carries for the same reason.
+  //
+  // BEHAVIOUR CHANGE, deliberate — the old pattern was never row-scoped:
+  // `\s` and `[^|]` both match `\n`, so the greedy cell loop ran to the LAST
+  // SP cell in the whole section and reported ONE violation spanning every
+  // row in between (an offendingContent of "| ID | Story Points |\n|---|---|\n
+  // | FR-001 | Login | 5 |\n\n## Roadmap\n\n| Sprint | Story Points |" for a
+  // two-table document). Two offending rows now yield two violations, each
+  // carrying its own row as evidence. Pinned by the tests in
+  // __tests__/regex-hardening.test.ts, which fail on the pre-fix code.
+  const violations: HardOutputRuleViolation[] = [];
+  for (const line of content.split("\n")) {
+    if (!TABLE_ROW_START.test(line)) continue;
+    if (!line.split("|").some((cell) => SP_CELL.test(cell))) continue;
+    violations.push(
+      makeViolation(
+        "sp_not_in_fr_table",
+        sectionType,
+        "FR table contains Story Points column — SP belongs only in Implementation Roadmap",
+        line.substring(0, 120),
+      ),
+    );
+  }
+  return violations;
 }
 
 // Rule 9: Uneven SP Distribution

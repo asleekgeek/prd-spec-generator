@@ -152,4 +152,113 @@ describe("polynomial-ReDoS patterns stay sub-quadratic", () => {
   it("identifier runs in test code (bash function pattern)", () => {
     expectSubQuadratic((n) => ["| test_a |", "```bash", "test".repeat(n), "```"].join("\n"), "testing");
   });
+
+  // The three witnesses below are CodeQL's own, taken verbatim from the
+  // js/polynomial-redos report. Each measured 3.9x–4.0x per doubling before
+  // the fix; the shared `findPatternViolations` call site was the reported
+  // location, but the quadratic lived in the patterns passed to it.
+  it("near-miss runs in one SP table cell (sp_not_in_fr_table)", () => {
+    expectSubQuadratic((n) => "|storypoint" + "storypoints".repeat(n), "requirements");
+  });
+
+  it("comment runs in an unterminated test body (no_placeholder_tests)", () => {
+    expectSubQuadratic((n) => "func testa(){{//TODO" + "//TODO".repeat(n), "testing");
+  });
+
+  it("space runs after a matrix row's third cell (no_placeholder_tests)", () => {
+    expectSubQuadratic((n) => "|testa||" + " ".repeat(n), "testing");
+  });
+});
+
+describe("SP-in-FR-table detection is row-scoped", () => {
+  const spViolations = (content: string) =>
+    validateSection(content, "requirements").violations.filter(
+      (v) => v.rule === "sp_not_in_fr_table",
+    );
+
+  // Pre-fix, `\s` and `[^|]` both matched `\n`, so the greedy cell loop ran to
+  // the LAST SP cell in the section and reported ONE violation whose evidence
+  // spanned every row in between. Two offending rows are two violations.
+  it("reports one violation per offending row (fails pre-fix: coalesced to 1)", () => {
+    const content = [
+      "| ID | Story Points |",
+      "|---|---|",
+      "| FR-002 | Story Points |",
+    ].join("\n");
+    expect(spViolations(content)).toHaveLength(2);
+  });
+
+  it("carries only its own row as evidence (fails pre-fix: evidence spanned rows)", () => {
+    const content = [
+      "| ID | Story Points |",
+      "|---|---|",
+      "| FR-002 | Story Points |",
+    ].join("\n");
+    expect(spViolations(content).map((v) => v.offendingContent)).toEqual([
+      "| ID | Story Points |",
+      "| FR-002 | Story Points |",
+    ]);
+  });
+
+  it.each([
+    ["| ID | Story Points |", "canonical spelling"],
+    ["| ID | story  points |", "lowercase, double space"],
+    ["  | ID | StoryPoint |", "indented, singular, no space"],
+    ["| ID | Story\tPoints |", "tab between the words"],
+  ])("still flags %s (%s)", (row) => {
+    expect(spViolations(row)).toHaveLength(1);
+  });
+
+  it.each([
+    ["| ID | Title | Priority |", "table with no SP column"],
+    ["Story Points are tracked in the roadmap.", "prose, not a table row"],
+    ["|---|---|", "separator row"],
+  ])("does not flag %s (%s)", (row) => {
+    expect(spViolations(row)).toHaveLength(0);
+  });
+});
+
+describe("placeholder-test detection", () => {
+  const placeholderViolations = (content: string) =>
+    validateSection(content, "testing").violations.filter(
+      (v) => v.rule === "no_placeholder_tests",
+    );
+
+  it.each([
+    ["func testA() { // TODO }", "TODO body"],
+    ["func testA() { // FIXME }", "FIXME body"],
+    ["func testA() throws { // PLACEHOLDER }", "PLACEHOLDER body, throws"],
+    ["func testA() { func testB() { //TODO } }", "comment in a nested brace run"],
+  ])("flags %s (%s)", (content) => {
+    expect(placeholderViolations(content)).toHaveLength(1);
+  });
+
+  it.each([
+    ["func testA() { assertTrue(x) }", "real body"],
+    ["func testA() { no todo } func testB() { assert() }", "two real bodies"],
+  ])("does not flag %s (%s)", (content) => {
+    expect(placeholderViolations(content)).toHaveLength(0);
+  });
+
+  it("flags only the placeholder among several test funcs", () => {
+    const content = "func testA() { assert() } func testB() { // TODO }";
+    const violations = placeholderViolations(content);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].offendingContent).toContain("testB");
+  });
+
+  it.each([
+    "| test_a | covers AC-1 | // TODO",
+    "| test_a | covers AC-1 | ` // TODO",
+    "| test_a | covers AC-1 |   `   // Setup",
+  ])("flags the matrix row %s", (row) => {
+    expect(placeholderViolations(row)).toHaveLength(1);
+  });
+
+  // The one behavioural delta the differential found: `\s` matched `\n`, so a
+  // comment on the NEXT line was read as the row's own third cell. A markdown
+  // row cannot wrap, so this was a false positive, not a lost detection.
+  it("does not flag a comment on the line AFTER the row (fails pre-fix)", () => {
+    expect(placeholderViolations("| test_a | covers AC-1 |\n// TODO")).toHaveLength(0);
+  });
 });
