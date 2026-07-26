@@ -18,6 +18,19 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      # better-sqlite3 13.x declares `engines.node: ">=22"`, and this project
+      # declares `>=20.0.0` and tests 20.x in CI. Proposing 13 produces a PR
+      # that can never pass: on Node 20 the vitest worker forks carrying the
+      # native addon exit unexpectedly (3 files, 22 tests, observed on PR #44).
+      # 12.11.1 declares `20.x||22.x||23.x||24.x` and is what we track.
+      #
+      # This is a version-currency hold, NOT a security one — better-sqlite3
+      # has never appeared in this repo's advisory set, and minor/patch updates
+      # inside 12.x still flow. Lift it in the same change that raises
+      # `engines.node`, never on its own.
+      - dependency-name: "better-sqlite3"
+        versions: [">=13.0.0"]
     groups:
       npm-development:
         dependency-type: "development"
