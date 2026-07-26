@@ -59,6 +59,33 @@ one-line addition.
 from which commit*, not that the source is free of defects; and it is worth
 nothing to a user who does not run the verification.
 
+### Scorecard controls, and the one that is declined
+
+Issue #36 addressed the nine open Scorecard findings. Seven closed because a
+control now exists, not because the alert was silenced:
+
+| check | control |
+|---|---|
+| `VulnerabilitiesID` | 39 advisories → 0, with `pnpm.auditConfig.ignoreGhsas` emptied. Floors in `pnpm.overrides` are each advisory's `first_patched_version`. |
+| `PinnedDependenciesID` | `bin/ensure-deps.sh` runs `npm ci` against a committed `mcp-server/package-lock.json`, verifying integrity hashes on the user's machine. |
+| `TokenPermissionsID` | every workflow declares top-level `permissions:`. |
+| `DependencyUpdateToolID` | `.github/dependabot.yml`, covering `npm` **and** `github-actions` (SHA pins do not age out on their own). |
+| `FuzzingID` | property-based tests under `fast-check` (`packages/validation/src/__tests__/validate-section.properties.test.ts`). |
+| `BranchProtectionID` | `main` requires a pull request and passing CI (`build + test` on 20.x/22.x, CodeQL analyse), blocks force-pushes and deletion, and requires conversation resolution. |
+
+**`CodeReviewID` is declined, and the reason is structural.** It scores
+"approved changesets" over recent history, and GitHub does not permit a user to
+approve their own pull request. On a single-maintainer repository the only ways
+to make this check pass are to add a second human reviewer or to have the
+maintainer approve their own work through a second account — the first is not
+available here, and the second manufactures the evidence the check exists to
+gather. Branch protection therefore requires a pull request with
+`required_approving_review_count: 0`: every change still lands through a PR with
+CI enforced and a reviewable diff, which is the part that carries real value at
+this team size, while the approval count honestly reports zero rather than
+laundering a self-approval into a green metric. This is revisited the moment a
+second maintainer joins.
+
 ## Reporting a Vulnerability
 
 If you discover a security issue in this project, **do not** open a public
