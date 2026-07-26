@@ -7,12 +7,12 @@ import { buildClaimPrompt, resolveClaimEvidence } from "../lib/prompt-builder.mj
 import { loadGroundTruth, summarize } from "../calibrate.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const GROUND_TRUTH_PATH = join(__dirname, "..", "fixtures", "ground-truth.json");
+const FIXTURES_DIR = join(__dirname, "..", "fixtures");
 
 const MAX_PROMPT_CHARS = 8000; // task requirement: claim-scoped prompts target <= 8K chars
 
 test("loadGroundTruth: fixture has exactly the 10 documented claims", () => {
-  const gt = loadGroundTruth(GROUND_TRUTH_PATH);
+  const gt = loadGroundTruth();
   assert.equal(gt.claims.length, 10);
   const ids = gt.claims.map((c) => c.claim_id);
   assert.deepEqual(
@@ -22,7 +22,7 @@ test("loadGroundTruth: fixture has exactly the 10 documented claims", () => {
 });
 
 test("buildClaimPrompt: every claim-scoped prompt stays under the 8K char budget", () => {
-  const gt = loadGroundTruth(GROUND_TRUTH_PATH);
+  const gt = loadGroundTruth();
   for (const claim of gt.claims) {
     const prompt = buildClaimPrompt(claim);
     assert.ok(
@@ -33,8 +33,8 @@ test("buildClaimPrompt: every claim-scoped prompt stays under the 8K char budget
 });
 
 test("buildClaimPrompt: is NOT the full PRD — every claim prompt is far smaller than fixtures/01-prd.md", () => {
-  const fullPrd = readFileSync(join(__dirname, "..", "fixtures", "01-prd.md"), "utf8");
-  const gt = loadGroundTruth(GROUND_TRUTH_PATH);
+  const fullPrd = readFileSync(join(FIXTURES_DIR, "01-prd.md"), "utf8");
+  const gt = loadGroundTruth();
   for (const claim of gt.claims) {
     const prompt = buildClaimPrompt(claim);
     assert.ok(
@@ -52,7 +52,7 @@ test("buildClaimPrompt: zero neighbor-claim leakage between UNRELATED claims (no
   // with NO dependency/reference relationship must not share each other's
   // claim-specific wording. Reference behavior mirrors PR #18's snippet
   // fix (a judge sees only what its claim is linked to).
-  const gt = loadGroundTruth(GROUND_TRUTH_PATH);
+  const gt = loadGroundTruth();
   const byId = Object.fromEntries(gt.claims.map((c) => [c.claim_id, c]));
 
   // Deliberately-unrelated pairs: neither claim's `text` references the
@@ -76,33 +76,27 @@ test("buildClaimPrompt: zero neighbor-claim leakage between UNRELATED claims (no
   }
 });
 
-test("resolveClaimEvidence: honors prompt_source over an inline evidence field", () => {
-  const gt = loadGroundTruth(GROUND_TRUTH_PATH);
-  const ac008 = gt.claims.find((c) => c.claim_id === "AC-008");
-  assert.equal(ac008.prompt_source, "01-prd-precorrection-us01.md");
-  assert.equal(ac008.evidence, undefined, "AC-008 should source evidence from prompt_source, not an inline field");
-
-  const fileContent = readFileSync(join(__dirname, "..", "fixtures", ac008.prompt_source), "utf8");
-  assert.equal(resolveClaimEvidence(ac008), fileContent);
-
-  // prompt_source wins even if an inline evidence field is also present.
-  const withBoth = { ...ac008, evidence: "should be ignored" };
-  assert.equal(resolveClaimEvidence(withBoth), fileContent);
-});
-
-test("resolveClaimEvidence: falls back to the inline evidence field when prompt_source is absent", () => {
-  const gt = loadGroundTruth(GROUND_TRUTH_PATH);
+test("resolveClaimEvidence: returns the claim's inline evidence", () => {
+  const gt = loadGroundTruth();
   const fr001 = gt.claims.find((c) => c.claim_id === "FR-001");
-  assert.equal(fr001.prompt_source, undefined);
   assert.equal(resolveClaimEvidence(fr001), fr001.evidence);
 });
 
-test("resolveClaimEvidence: throws when a claim has neither prompt_source nor evidence", () => {
-  assert.throws(() => resolveClaimEvidence({ claim_id: "BOGUS" }), /neither prompt_source nor/);
+test("resolveClaimEvidence: throws when a claim has no evidence", () => {
+  assert.throws(() => resolveClaimEvidence({ claim_id: "BOGUS" }), /no non-empty evidence field/);
+});
+
+test("resolveClaimEvidence: AC-008's evidence is inline, not a filename to read", () => {
+  const gt = loadGroundTruth();
+  const ac008 = gt.claims.find((c) => c.claim_id === "AC-008");
+  assert.equal(typeof ac008.evidence, "string");
+  assert.ok(ac008.evidence.length > 0);
+  assert.equal(ac008.prompt_source, undefined, "prompt_source drove a runtime file read and is gone");
+  assert.equal(resolveClaimEvidence(ac008), ac008.evidence);
 });
 
 test("buildClaimPrompt: AC-008's prompt is built from the historical pre-correction PRD text, not fixtures/01-prd.md, and contains the uniform-vs-segmented contradiction", () => {
-  const gt = loadGroundTruth(GROUND_TRUTH_PATH);
+  const gt = loadGroundTruth();
   const ac008 = gt.claims.find((c) => c.claim_id === "AC-008");
   const prompt = buildClaimPrompt(ac008);
 
@@ -129,7 +123,7 @@ test("buildClaimPrompt: AC-008's prompt is built from the historical pre-correct
 });
 
 test("summarize: computes agreement rate, confusion table, and the AC-008 catch flag", () => {
-  const gt = loadGroundTruth(GROUND_TRUTH_PATH);
+  const gt = loadGroundTruth();
   const rows = gt.claims.map((claim) => {
     if (claim.claim_id === "AC-008") {
       return { claim, result: { status: "ok", verdict: { verdict: "FAIL", rationale: "r", caveats: [], confidence: 0.6 }, latency_ms: 100 } };
@@ -150,7 +144,7 @@ test("summarize: computes agreement rate, confusion table, and the AC-008 catch 
 });
 
 test("summarize: skipped claims are excluded from agreement rate, not counted as disagreement", () => {
-  const gt = loadGroundTruth(GROUND_TRUTH_PATH);
+  const gt = loadGroundTruth();
   const rows = gt.claims.map((claim) => ({ claim, result: { status: "skipped", reason: "no credentials" } }));
   const summaryObj = summarize(rows);
   assert.equal(summaryObj.scored, 0);
@@ -160,7 +154,7 @@ test("summarize: skipped claims are excluded from agreement rate, not counted as
 });
 
 test("summarize: a judge that always PASSes gets high agreement but does NOT catch AC-008", () => {
-  const gt = loadGroundTruth(GROUND_TRUTH_PATH);
+  const gt = loadGroundTruth();
   const rows = gt.claims.map((claim) => ({
     claim,
     result: { status: "ok", verdict: { verdict: "PASS", rationale: "r", caveats: [], confidence: 0.9 }, latency_ms: 50 },
@@ -172,41 +166,50 @@ test("summarize: a judge that always PASSes gets high agreement but does NOT cat
   assert.equal(summaryObj.ac008Caught, false);
 });
 
-// ── prompt_source containment (js/file-access-to-http) ───────────────────────
-// `resolveClaimEvidence` reads a file named by DATA and the result is posted to
-// a third-party LLM endpoint, so a `prompt_source` that escapes fixtures/ is an
-// exfiltration primitive, not just a bad path. These pin the boundary check.
+// ── no runtime file read reaches the network (js/file-access-to-http) ────────
+// The harness posts claim evidence to a third-party LLM endpoint. It used to
+// obtain that evidence by reading a path named in DATA (`prompt_source`) or on
+// the command line (`--prompt-file`), which made the corpus substitutable at
+// run time — an exfiltration primitive that #37 could only guard, not remove.
+// The corpus is now a statically imported module and the CLI reads stdin, so
+// there is no path to redirect. These pin that property at both ends.
 
-test("resolveClaimEvidence: reads a file inside fixtures/", () => {
-  const text = resolveClaimEvidence({ claim_id: "T-1", prompt_source: "01-prd.md" });
-  assert.equal(typeof text, "string");
-  assert.ok(text.length > 0);
-});
+/**
+ * Source with comments removed, so these checks read CODE and not the prose
+ * explaining why the code looks the way it does. (Without this, the comments
+ * below — which name `readFileSync` to say it is gone — fail the check they
+ * document.)
+ */
+function codeOf(relPath) {
+  return readFileSync(join(__dirname, "..", relPath), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ") // block comments
+    .replace(/^[ \t]*\/\/.*$/gm, " "); // whole-line comments
+}
 
-test("resolveClaimEvidence: refuses a traversing prompt_source", () => {
-  for (const escape of [
-    "../../../package.json",
-    "../../package.json",
-    "subdir/../../../package.json",
-  ]) {
-    assert.throws(
-      () => resolveClaimEvidence({ claim_id: "T-2", prompt_source: escape }),
-      /escapes the fixtures directory/,
-      `expected "${escape}" to be refused`,
-    );
+test("no module in the prompt→network path opens a file at run time", () => {
+  for (const mjs of ["lib/prompt-builder.mjs", "lib/openai-client.mjs", "lib/judge-core.mjs", "judge.mjs"]) {
+    const code = codeOf(mjs);
+    assert.ok(!/from\s+"node:fs"/.test(code), `${mjs} imports node:fs; its data reaches an outbound request`);
+    assert.ok(!/\breadFileSync\s*\(/.test(code), `${mjs} calls readFileSync; its data reaches an outbound request`);
   }
 });
 
-test("resolveClaimEvidence: refuses an absolute prompt_source", () => {
-  assert.throws(
-    () => resolveClaimEvidence({ claim_id: "T-3", prompt_source: "/etc/hosts" }),
-    /escapes the fixtures directory/,
+test("calibrate.mjs binds the corpus by import, not by a runtime path", () => {
+  const code = codeOf("calibrate.mjs");
+  assert.ok(
+    /^import groundTruthFixture from "\.\/fixtures\/ground-truth\.json" with \{ type: "json" \};$/m.test(code),
+    "calibrate.mjs must bind ground-truth.json as a static JSON module",
   );
+  assert.ok(!/\breadFileSync\s*\(/.test(code), "calibrate.mjs must not read the corpus at run time");
 });
 
-test("resolveClaimEvidence: refuses fixtures/ itself", () => {
-  assert.throws(
-    () => resolveClaimEvidence({ claim_id: "T-4", prompt_source: "." }),
-    /escapes the fixtures directory/,
-  );
+// `evidence_source` is provenance, not an instruction — nothing reads it. This
+// pins it to the text it claims to document, so the pointer cannot rot into a
+// lie once the read that would have caught a mismatch is gone.
+test("AC-008's inline evidence is byte-identical to the file evidence_source names", () => {
+  const gt = loadGroundTruth();
+  const ac008 = gt.claims.find((c) => c.claim_id === "AC-008");
+  assert.equal(ac008.evidence_source, "01-prd-precorrection-us01.md");
+  const provenance = readFileSync(join(FIXTURES_DIR, ac008.evidence_source), "utf8");
+  assert.equal(ac008.evidence, provenance);
 });
