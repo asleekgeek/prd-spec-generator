@@ -17,13 +17,12 @@
  * — now fails here.
  */
 
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
-import { readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as yaml from "js-yaml";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { AuditFlagEngine } from "../audit-flags/engine.js";
 import type { SectionType } from "@prd-gen/core";
 
@@ -36,16 +35,6 @@ const FAMILY = `family:
   description: d
   primary_persona: p
 `;
-
-let dir: string;
-beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), "audit-rules-"));
-});
-afterAll(() => {
-  rmSync(dir, { recursive: true, force: true });
-});
-
-const write = (name: string, body: string) => writeFileSync(join(dir, name), body);
 
 describe("AuditFlagEngine — rule loading", () => {
   it("returns no rules for a directory that does not exist", () => {
