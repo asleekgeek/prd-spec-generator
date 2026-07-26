@@ -1,18 +1,77 @@
 import type { HardOutputRuleViolation, SectionType } from "@prd-gen/core";
 import { findPatternViolations, makeViolation } from "./helpers.js";
 
+const PLACEHOLDER_MESSAGE =
+  "Found placeholder test with empty or TODO-only body";
+
+/**
+ * A body is "placeholder" when it carries a TODO/FIXME/PLACEHOLDER comment.
+ * Applied ONCE to an already-extracted body, so it cannot backtrack: there is
+ * no quantifier around it to re-split the input.
+ */
+const PLACEHOLDER_COMMENT = /\/\/\s*(?:TODO|FIXME|PLACEHOLDER)/;
+
 // Rule 7: No Placeholder Tests
 export function checkNoPlaceholderTests(
   content: string,
   sectionType: SectionType,
 ): HardOutputRuleViolation[] {
-  const patterns: RegExp[] = [
-    /func\s+test\w+\s*\([^)]*\)\s*(?:throws\s+)?(?:async\s+)?(?:throws\s+)?\{[^}]*\/\/\s*(?:TODO|FIXME|PLACEHOLDER)[^}]*\}/g,
-    /func\s+test\w+\s*\([^)]*\)\s*(?:throws\s+)?(?:async\s+)?(?:throws\s+)?\{\s*\}/g,
-    /^\s*\|\s*test\w+\s*\|[^|]*\|\s*`?\s*\/\/\s*(?:TODO|Setup)/gm,
-  ];
+  // The body pattern was
+  //   `…\{[^}]*\/\/\s*(?:TODO|FIXME|PLACEHOLDER)[^}]*\}`
+  // and was quadratic (js/polynomial-redos): with the closing brace absent,
+  // the leading `[^}]*` offers a split at every `//` and the trailing
+  // `[^}]*\}` rescans to end-of-input for each one. Measured 3.89x, 4.01x,
+  // 4.00x per doubling (11 ms at 12 KB, 713 ms at 96 KB).
+  //
+  // A brace-run is delimited, so capturing it once and testing the capture is
+  // both linear and exactly equivalent: `[^}]` cannot cross `}`, so the old
+  // pattern already required the comment to sit in the FIRST brace-run — the
+  // very text `([^}]*)` captures. A 30k-input differential (old regex vs this
+  // form, including nested-brace, missing-brace and multi-function cases)
+  // reported 0 differing inputs. Measured 1.98x per doubling after the change.
+  //
+  // Driven by `.exec`, so it is built per call rather than hoisted: `.exec`
+  // advances `lastIndex` on a /g regex, and a shared object would carry that
+  // state into the next call (same reason sp-rules.ts hoists only its
+  // `matchAll` pattern).
+  const testFuncBody =
+    /func\s+test\w+\s*\([^)]*\)\s*(?:throws\s+)?(?:async\s+)?(?:throws\s+)?\{([^}]*)\}/g;
 
   const violations: HardOutputRuleViolation[] = [];
+
+  let bodyMatch: RegExpExecArray | null;
+  while ((bodyMatch = testFuncBody.exec(content)) !== null) {
+    if (!PLACEHOLDER_COMMENT.test(bodyMatch[1])) continue;
+    violations.push(
+      makeViolation(
+        "no_placeholder_tests",
+        sectionType,
+        PLACEHOLDER_MESSAGE,
+        bodyMatch[0].substring(0, 120),
+      ),
+    );
+  }
+
+  // The empty-body and matrix-row patterns stay declarative — neither has a
+  // quantifier pair that can re-split the same characters.
+  //
+  // The matrix row was `^\s*\|\s*test\w+\s*\|[^|]*\|\s*`?\s*\/\/\s*(?:TODO|Setup)`,
+  // quadratic through the ``\s*`?\s*`` pair: with the backtick absent, a run of
+  // spaces can be split between the two `\s*` in n+1 ways. Measured 3.95x,
+  // 3.99x, 4.04x per doubling. `[ \t]*(?:`[ \t]*)?` accepts the same language
+  // — whitespace, optionally a backtick, optionally more whitespace — with
+  // exactly one parse, and measured 1.97x after the change.
+  //
+  // The classes are narrowed to horizontal space in the same edit because the
+  // rule is about ONE matrix row: `\s` and `[^|]` both match `\n`, so the old
+  // pattern also accepted the `// TODO` on a LATER line than the row it
+  // belongs to. That is the single behavioural delta a 20k-input differential
+  // found, and it is pinned by a test.
+  const patterns: readonly RegExp[] = [
+    /func\s+test\w+\s*\([^)]*\)\s*(?:throws\s+)?(?:async\s+)?(?:throws\s+)?\{\s*\}/g,
+    /^[ \t]*\|[ \t]*test\w+[ \t]*\|[^|\n]*\|[ \t]*(?:`[ \t]*)?\/\/[ \t]*(?:TODO|Setup)/gm,
+  ];
+
   for (const pattern of patterns) {
     violations.push(
       ...findPatternViolations(
@@ -20,7 +79,7 @@ export function checkNoPlaceholderTests(
         content,
         "no_placeholder_tests",
         sectionType,
-        "Found placeholder test with empty or TODO-only body",
+        PLACEHOLDER_MESSAGE,
       ),
     );
   }

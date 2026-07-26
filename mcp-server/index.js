@@ -24549,8 +24549,18 @@ function extractTypeName(line) {
 }
 
 // packages/validation/dist/hard-output-rules/rules/sp-rules.js
+var TABLE_ROW_START = /^[ \t]*\|/;
+var SP_CELL = /Story[ \t]*Points?/i;
 function checkSPNotInFRTable(content, sectionType) {
-  return findPatternViolations(/^\s*\|(?:[^|]*\|)*[^|]*(?:Story\s*Points?)[^|]*\|/gim, content, "sp_not_in_fr_table", sectionType, "FR table contains Story Points column \u2014 SP belongs only in Implementation Roadmap");
+  const violations = [];
+  for (const line of content.split("\n")) {
+    if (!TABLE_ROW_START.test(line))
+      continue;
+    if (!line.split("|").some((cell) => SP_CELL.test(cell)))
+      continue;
+    violations.push(makeViolation("sp_not_in_fr_table", sectionType, "FR table contains Story Points column \u2014 SP belongs only in Implementation Roadmap", line.substring(0, 120)));
+  }
+  return violations;
 }
 function checkUnevenSPDistribution(content, sectionType) {
   const sprintLabel = /(?:sprint|iteration)\s*\d+/i;
@@ -24890,15 +24900,23 @@ function checkFKReferencesExist(content, sectionType) {
 }
 
 // packages/validation/dist/hard-output-rules/rules/test-rules.js
+var PLACEHOLDER_MESSAGE = "Found placeholder test with empty or TODO-only body";
+var PLACEHOLDER_COMMENT = /\/\/\s*(?:TODO|FIXME|PLACEHOLDER)/;
 function checkNoPlaceholderTests(content, sectionType) {
-  const patterns = [
-    /func\s+test\w+\s*\([^)]*\)\s*(?:throws\s+)?(?:async\s+)?(?:throws\s+)?\{[^}]*\/\/\s*(?:TODO|FIXME|PLACEHOLDER)[^}]*\}/g,
-    /func\s+test\w+\s*\([^)]*\)\s*(?:throws\s+)?(?:async\s+)?(?:throws\s+)?\{\s*\}/g,
-    /^\s*\|\s*test\w+\s*\|[^|]*\|\s*`?\s*\/\/\s*(?:TODO|Setup)/gm
-  ];
+  const testFuncBody = /func\s+test\w+\s*\([^)]*\)\s*(?:throws\s+)?(?:async\s+)?(?:throws\s+)?\{([^}]*)\}/g;
   const violations = [];
+  let bodyMatch;
+  while ((bodyMatch = testFuncBody.exec(content)) !== null) {
+    if (!PLACEHOLDER_COMMENT.test(bodyMatch[1]))
+      continue;
+    violations.push(makeViolation("no_placeholder_tests", sectionType, PLACEHOLDER_MESSAGE, bodyMatch[0].substring(0, 120)));
+  }
+  const patterns = [
+    /func\s+test\w+\s*\([^)]*\)\s*(?:throws\s+)?(?:async\s+)?(?:throws\s+)?\{\s*\}/g,
+    /^[ \t]*\|[ \t]*test\w+[ \t]*\|[^|\n]*\|[ \t]*(?:`[ \t]*)?\/\/[ \t]*(?:TODO|Setup)/gm
+  ];
   for (const pattern of patterns) {
-    violations.push(...findPatternViolations(pattern, content, "no_placeholder_tests", sectionType, "Found placeholder test with empty or TODO-only body"));
+    violations.push(...findPatternViolations(pattern, content, "no_placeholder_tests", sectionType, PLACEHOLDER_MESSAGE));
   }
   return violations;
 }

@@ -29,6 +29,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **Three polynomial-ReDoS patterns closed** in the hard-output rules
+  (`js/polynomial-redos`, the two CodeQL alerts that survived #37). All three
+  were reported at the shared `findPatternViolations` call site but lived in the
+  patterns handed to it: `sp_not_in_fr_table`'s cell scan, and
+  `no_placeholder_tests`' TODO-body and matrix-row patterns. Each measured
+  3.9x–4.0x per doubling before the fix — 2.6 s on a 176 KB single-line input —
+  and is now linear. Pinned by growth-ratio tests (not wall-clock thresholds) in
+  `packages/validation/src/__tests__/regex-hardening.test.ts`, each of which
+  fails on the pre-fix code.
+
 - Internal diagnostics tools are **gated, not merely hidden** under the `agent`
   profile (#28 criterion 5): an excluded tool is absent from `tools/list` AND
   rejected on call (`RegisteredTool.disable()` → `-32602 "Tool … disabled"`).
@@ -36,6 +46,19 @@ adheres to [Semantic Versioning](https://semver.org/).
   optimization. Asserted by `packages/mcp-server/src/__tests__/mcp-prompts.test.ts`.
 
 ### Changed
+
+- **`sp_not_in_fr_table` is now row-scoped** (consequence of the ReDoS fix
+  above; the old pattern had no linear equivalent). `\s` and `[^|]` both match
+  `\n`, so the old greedy cell loop ran to the LAST Story-Points cell in the
+  section and emitted ONE violation whose evidence spanned every row in
+  between. Two offending rows now produce two violations, each carrying its own
+  row as `offendingContent` — so a section with N offending rows scores N
+  penalties where it previously scored one.
+
+- **`no_placeholder_tests` matrix-row detection is line-scoped.** For the same
+  reason (`\s` matching `\n`), a `// TODO` on the line *after* a matrix row was
+  read as that row's third cell. A markdown row cannot wrap, so this removes a
+  false positive rather than a detection.
 
 - The default MCP tool profile is `full` (behaviour preserved). This diverges
   from #28 criterion 3's "default to the agent-facing set": shrinking the
