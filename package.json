@@ -2,6 +2,7 @@
   "name": "prd-spec-generator",
   "version": "0.6.1",
   "private": true,
+  "license": "MIT",
   "description": "Production-grade PRD generator with closed-loop reliability calibration, multi-judge verification against externally-grounded oracles, and mechanically-sealed falsifier protocols. 17 MCP tools, 962 tests, full audit lineage.",
   "scripts": {
     "build": "pnpm -r --workspace-concurrency=1 build",

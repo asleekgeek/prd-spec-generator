@@ -79,6 +79,18 @@ Full text in [`rules/coding-standards.md`](https://github.com/cdeust/zetetic-tea
 
 ## Testing
 
+**The policy, stated plainly: every change that adds or alters externally
+observable behaviour must arrive with tests for that behaviour, in the same
+pull request.** A bug fix carries a regression test that fails on the pre-fix
+code. A new function carries contract tests for its postconditions. A new error
+path carries a test asserting the observable effect of taking it, including the
+signal it emits — not only a downstream side effect. Changes that alter no
+behaviour (formatting, comments, documentation) are exempt, and saying so in the
+PR description is enough.
+
+This is checked during review, and a PR that adds behaviour without tests is
+sent back rather than merged with a follow-up promise.
+
 - **Contract tests, not implementation mirrors.** Assertions go on observable
   postconditions, not on the formula the function uses to compute its output.
   See `packages/benchmark/src/__tests__/pipeline-kpis.test.ts` for examples.
