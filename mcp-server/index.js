@@ -24520,11 +24520,12 @@ function makeViolation(rule, sectionType, message, offendingContent = null) {
   };
 }
 function extractCodeBlocks(content) {
-  const pattern = /```(?:\w+)?[ \t]*\r?\n(?:[ \t]*\r?\n)*([\s\S]*?)```/g;
+  const pattern = /```(?:\w+)?[ \t]*\r?\n([\s\S]*?)```/g;
+  const LEADING_BLANK = /^(?:[ \t]*\r?\n)+/;
   const blocks = [];
   let match;
   while ((match = pattern.exec(content)) !== null) {
-    blocks.push(match[1]);
+    blocks.push(match[1].replace(LEADING_BLANK, ""));
   }
   return blocks;
 }

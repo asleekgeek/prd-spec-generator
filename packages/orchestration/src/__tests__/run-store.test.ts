@@ -13,7 +13,7 @@
  *     composition root can release run-tied evidence).
  */
 import { describe, expect, it } from "vitest";
-import { InMemoryRunStore, type Clock } from "../index.js";
+import { InMemoryRunStore } from "../index.js";
 import { newPipelineState, type PipelineState } from "../index.js";
 
 /** Mutable fake clock — tests advance time explicitly, never sleep. */

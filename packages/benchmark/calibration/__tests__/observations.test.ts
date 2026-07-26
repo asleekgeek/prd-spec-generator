@@ -24,7 +24,6 @@ import { describe, it, expect } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { randomUUID } from "node:crypto";
 import {
   extractJudgeObservations,
   flushObservations,
@@ -49,15 +48,18 @@ function makeVerdict(overrides: Partial<JudgeVerdict> = {}): JudgeVerdict {
   };
 }
 
+/**
+ * Build a claim-type map that types every claim as "correctness".
+ *
+ * Takes claim IDs, which is what the call sites actually have. The previous
+ * signature took `[id, verdict]` pairs and discarded the verdict, so no test
+ * could use it without inventing verdicts it did not need — which is why it
+ * sat unreferenced while three sites hand-rolled the same Map.
+ */
 function makeClaimTypes(
-  entries: Array<[string, JudgeVerdict["verdict"]]> = [],
+  claimIds: readonly string[] = [],
 ): ReadonlyMap<string, "correctness"> {
-  // Defaults all to "correctness" for test simplicity.
-  const base = new Map<string, "correctness">();
-  for (const [id] of entries) {
-    base.set(id, "correctness");
-  }
-  return base;
+  return new Map(claimIds.map((id) => [id, "correctness"] as const));
 }
 
 function makeTmpQueuePath(): string {
@@ -99,9 +101,7 @@ describe("extractJudgeObservations — cardinality", () => {
       }
     }
 
-    const claimTypes = new Map<string, "correctness">(
-      claimIds.map((id) => [id, "correctness"]),
-    );
+    const claimTypes = makeClaimTypes(claimIds);
     const goldenSet: GoldenSet = new Map();
 
     const obs = extractJudgeObservations("run-1", verdicts, claimTypes, goldenSet);
@@ -243,7 +243,7 @@ describe("JSONL queue — schema versioning", () => {
 describe("extractJudgeObservations — loud-fail on bad shape", () => {
   it("throws when verdict lacks required fields", () => {
     const badVerdict = { judge: { kind: "genius", name: "feynman" } };
-    const claimTypes = new Map<string, "correctness">();
+    const claimTypes = makeClaimTypes();
     const goldenSet: GoldenSet = new Map();
 
     expect(() =>
@@ -259,7 +259,7 @@ describe("extractJudgeObservations — loud-fail on bad shape", () => {
       confidence: "high", // wrong type
       caveats: [],
     };
-    const claimTypes = new Map<string, "correctness">();
+    const claimTypes = makeClaimTypes();
     const goldenSet: GoldenSet = new Map();
 
     expect(() =>
@@ -395,9 +395,7 @@ describe("AP-5 falsifier — synthetic injection", () => {
       }
     }
 
-    const claimTypes = new Map<string, "correctness">(
-      claimIds.map((id) => [id, "correctness"]),
-    );
+    const claimTypes = makeClaimTypes(claimIds);
 
     // C1, C2 have known ground truth; C3, C4, C5 do not.
     const goldenSet: GoldenSet = new Map([

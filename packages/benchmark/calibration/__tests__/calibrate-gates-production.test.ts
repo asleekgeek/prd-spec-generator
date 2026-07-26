@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { mkdirSync, rmSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -31,15 +31,17 @@ import {
   type AgentInvoker,
 } from "@prd-gen/orchestration";
 
-const TMP_PREFIX = join(
-  tmpdir(),
-  `calib-prod-test-${process.pid}-${Date.now()}`,
-);
-let counter = 0;
+/**
+ * Atomic temp dir per call. mkdtempSync creates the directory as part of
+ * choosing its name, so no other process can win a race to that path — a
+ * `${pid}-${Date.now()}-${counter}` prefix is predictable and was flagged
+ * js/insecure-temporary-file once these tests began WRITING artefacts into
+ * it (the frozen-baseline fixtures below).
+ *
+ * source: the same fix applied repo-wide in 24316ee.
+ */
 function freshTmp(): string {
-  const dir = `${TMP_PREFIX}-${counter++}`;
-  mkdirSync(dir, { recursive: true });
-  return dir;
+  return mkdtempSync(join(tmpdir(), "calib-prod-test-"));
 }
 
 function makeFastDeterministicInvoker(): AgentInvoker {

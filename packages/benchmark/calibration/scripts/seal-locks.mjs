@@ -5,7 +5,7 @@
 // source: docs/PHASE_4_PLAN.md §4.1 / §4.2 / §4.5 sealing procedure
 // source: calibrate-gates.ts:driveRuns + calibrate-gates-constants.ts seeds
 
-import { writeFileSync, readFileSync, mkdtempSync } from "node:fs";
+import { writeFileSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";

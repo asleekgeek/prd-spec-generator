@@ -13,7 +13,6 @@ import { describe, it, expect, afterEach } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { randomUUID } from "node:crypto";
 import {
   computeAblationComparison,
   computeReliabilityComparison,

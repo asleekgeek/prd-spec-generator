@@ -24,7 +24,6 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { mkdtempSync } from "node:fs";
-import { createHash } from "node:crypto";
 import {
   computeAblationComparison,
   computeKpiGateComparison,

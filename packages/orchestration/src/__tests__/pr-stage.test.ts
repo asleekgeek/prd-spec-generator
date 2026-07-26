@@ -34,7 +34,6 @@ import {
   newPipelineState,
   step,
   type ActionResult,
-  type NextAction,
   type PipelineState,
 } from "../index.js";
 

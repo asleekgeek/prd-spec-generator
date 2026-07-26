@@ -14,7 +14,7 @@
 import { describe, it, expect } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdirSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { readFileSync, rmSync, existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import {
   extractJudgeObservations,

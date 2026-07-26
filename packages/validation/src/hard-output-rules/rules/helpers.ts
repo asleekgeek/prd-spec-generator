@@ -93,16 +93,24 @@ export function extractCodeBlocks(content: string): string[] {
   // language tag, then the rest of the fence line, then the newline", so the
   // horizontal-whitespace class says exactly that and is unambiguous.
   //
-  // The trailing `(?:[ \t]*\r?\n)*` is NOT cosmetic: the old `\s*\n` also ate
-  // any BLANK LINES between the fence and the first line of code, and an
-  // equivalence check against the old regex caught that dropping it changed
-  // what the rules see. Each repetition is anchored to its own newline, so
-  // the run is consumed deterministically rather than by backtracking.
-  const pattern = /```(?:\w+)?[ \t]*\r?\n(?:[ \t]*\r?\n)*([\s\S]*?)```/g;
+  // Blank lines between the fence and the first line of code must still be
+  // eaten (the original `\s*\n` ate them, and an equivalence check showed the
+  // rules see a different block without that). They are NOT eaten in the
+  // pattern, though: an in-pattern `(?:[ \t]*\r?\n)*` sitting in front of the
+  // lazy body capture is ambiguous — every blank line can belong either to
+  // that run or to the capture — and with an UNTERMINATED fence the engine
+  // re-splits the run for each failed scan to end-of-input. Measured O(n²):
+  // 1000 blank lines 0.4 ms, 2000 1.1 ms, 4000 4.1 ms, 8000 16.3 ms.
+  //
+  // Stripping them from the captured text instead is exactly equivalent
+  // (same characters removed, same order) and cannot backtrack: LEADING_BLANK
+  // is ^-anchored, applied once, to an already-extracted string.
+  const pattern = /```(?:\w+)?[ \t]*\r?\n([\s\S]*?)```/g;
+  const LEADING_BLANK = /^(?:[ \t]*\r?\n)+/;
   const blocks: string[] = [];
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(content)) !== null) {
-    blocks.push(match[1]);
+    blocks.push(match[1].replace(LEADING_BLANK, ""));
   }
   return blocks;
 }
