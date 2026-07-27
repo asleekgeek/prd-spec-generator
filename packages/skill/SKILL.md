@@ -151,7 +151,8 @@ Every response from `start_pipeline` and `submit_action_result` has this shape:
 
 **Action shape:** identical to `call_pipeline_tool` but `tool_name` refers to a **Cortex MCP** tool. Tool prefix convention: `mcp__plugin_hypermnesia-mcp_cortex__<tool_name>` or `mcp__cortex__<tool_name>` per your `.mcp.json`.
 
-> The plugin-scoped prefix carries **both** the plugin name and the MCP server key: `mcp__plugin_<plugin-name>_<server-key>__<tool>`. Cortex renamed the plugin `cortex` -> `hypermnesia-mcp` in v4.15.0 (community-directory name collision) while keeping the server key `cortex`, so the prefix is `mcp__plugin_hypermnesia-mcp_cortex__`, not `mcp__plugin_cortex_cortex__`. An unresolvable MCP tool name is dropped silently by the host, so the old prefix fails with no error.
+> The plugin-scoped prefix carries **both** the plugin name and the MCP server key: `mcp__plugin_<plugin-name>_<server-key>__<tool>`. Cortex renamed the plugin `cortex` -> `hypermnesia-mcp` in v4.15.0 (community-directory name collision) while keeping the server key `cortex`, so the prefix is `mcp__plugin_hypermnesia-mcp_cortex__`, not `mcp__plugin_cortex_cortex__`. An unresolvable MCP tool name is dropped silently by the host, so the old prefix fails with no error. <!-- mcp-prefix-allow-legacy: this line quotes the dead spelling on purpose -->
+
 
 The handlers currently emit `tool_name: "recall"` for section-context retrieval. Other Cortex tools may be added by future handlers; do not assume a fixed list.
 

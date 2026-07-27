@@ -52,7 +52,7 @@ actions and only surfaced the substantive `call_pipeline_tool`.
 ### Step 2 — Host calls automatised-pipeline
 
 ```
-host: mcp__plugin_automatised_pipeline__index_codebase({
+host: mcp__plugin_automatised-pipeline_automatised-pipeline__index_codebase({
   path: "/Users/me/projects/admin-console",
   output_dir: "/Users/me/projects/admin-console/.prd-gen/graphs/run_lzx8f9_a3k2m1"
 })
