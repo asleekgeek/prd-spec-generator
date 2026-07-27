@@ -31,6 +31,10 @@ const CLAIM_FILES = [
   "manifest.json",
   ".claude-plugin/marketplace.json",
   ".claude-plugin/plugin.json",
+  // The OpenSSF answers quote the count twice (test / test_most). Those are
+  // read by bestpractices.dev off the default branch and become a public
+  // assurance claim, which is the strongest reason of all to keep them true.
+  ".bestpractices.json",
 ];
 
 /** Every phrasing the count appears in. `%d` stands in for the number. */
