@@ -6,6 +6,28 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The server advertised the wrong version to every host that connected.**
+  `serverInfo.version` was the literal `0.4.0` in `packages/mcp-server/src/index.ts`
+  while package.json, `.claude-plugin/plugin.json`, manifest.json and server.json
+  all carried `0.6.1` — three releases of drift, read by every MCP client at
+  handshake and by the registry entry built from it. The number is no longer
+  written down twice: `server-version.ts` resolves it at startup from the
+  package.json that ships beside the running bundle (the plugin tree and the
+  staged .mcpb both carry `mcp-server/package.json`), falling back to the root
+  package.json for workspace runs, and returning an obviously-unresolved
+  sentinel rather than a plausible-looking number if neither can be read.
+  `pnpm bundle` stamps `mcp-server/package.json` from the root version
+  (`scripts/stamp-bundle-version.mjs`), and CI's bundle-freshness check now
+  diffs all of `mcp-server/`, so an unstamped commit fails.
+
+  The gate that should have caught this is fixed too: `smoke-mcpb.sh` printed
+  `serverInfo.version` in its OK line while asserting only that a serverInfo
+  existed, so the wrong version passed CI in green for three releases. It now
+  asserts the advertised version equals the one manifest.json declares — two
+  independent mirrors of the release, so the check can actually fail.
+
 ### Added
 
 - **MCP prompts capability** (#28): `prompts/list` + `prompts/get` publish the

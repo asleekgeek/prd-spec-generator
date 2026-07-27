@@ -14,8 +14,15 @@
 # things a host does first. Anything less — "the file exists", "the bundle is
 # 2.7 MB" — would have passed while the server was unstartable.
 #
-# Exit 0 iff: initialize returns a serverInfo, AND tools/list returns the
-# expected tool count. Exit 1 with the transcript otherwise.
+# The version assertion below pins a second regression of the same shape: this
+# script printed `serverInfo.version` in its OK line and asserted only that a
+# serverInfo existed, so the server advertised a hardcoded 0.4.0 for three
+# releases while the manifest shipped 0.6.1, in CI, in green. A number nobody
+# compares is a number nobody maintains.
+#
+# Exit 0 iff: initialize returns a serverInfo whose version is the one
+# manifest.json declares, AND tools/list returns the expected tool count.
+# Exit 1 with the transcript otherwise.
 set -euo pipefail
 
 EXPECTED_TOOLS="${EXPECTED_TOOLS:-17}"
@@ -46,11 +53,19 @@ RESPONSES="$(
     "${COMMAND}" "${ARGS[@]}" 2>"${STAGE_ROOT}/stderr.log" || true
 )"
 
+# Read from manifest.json, like COMMAND above: the version a host is told at
+# handshake has to be the version the artifact declares, and neither number is
+# written here, so this compares two independent mirrors of the release rather
+# than a constant against itself.
+EXPECTED_VERSION="$(node -e 'console.log(require("./manifest.json").version)')"
+
 # shellcheck disable=SC2016  # the node program is deliberately single-quoted:
-# every $ inside it belongs to JavaScript, and the two values it needs arrive
-# via the EXPECTED_TOOLS env var and argv, not via shell interpolation.
-EXPECTED_TOOLS="${EXPECTED_TOOLS}" node -e '
+# every $ inside it belongs to JavaScript, and the three values it needs arrive
+# via the EXPECTED_TOOLS / EXPECTED_VERSION env vars and argv, not via shell
+# interpolation.
+EXPECTED_TOOLS="${EXPECTED_TOOLS}" EXPECTED_VERSION="${EXPECTED_VERSION}" node -e '
 const expected = Number(process.env.EXPECTED_TOOLS);
+const expectedVersion = process.env.EXPECTED_VERSION;
 const lines = process.argv[1].split("\n").filter(Boolean);
 let init = null, tools = null;
 for (const l of lines) { try { const j = JSON.parse(l);
@@ -60,6 +75,9 @@ const fail = (m) => { console.error("SMOKE FAIL: " + m); process.exit(1); };
 if (!init) fail("no response to initialize — the server did not start");
 if (init.error) fail("initialize returned an error: " + JSON.stringify(init.error));
 if (!init.result?.serverInfo?.name) fail("initialize returned no serverInfo");
+const advertised = init.result.serverInfo.version;
+if (advertised !== expectedVersion)
+  fail(`serverInfo.version is ${advertised}, manifest.json declares ${expectedVersion}`);
 if (!tools) fail("no response to tools/list");
 if (tools.error) fail("tools/list returned an error: " + JSON.stringify(tools.error));
 const n = (tools.result?.tools || []).length;

@@ -112,15 +112,21 @@ jobs:
         run: pnpm bundle
 
       - name: Bundle freshness check
-        # The committed mcp-server/index.js MUST match what the current
-        # source produces. Drift means a contributor forgot to re-bundle
-        # before committing. Fail CI rather than silently shipping a
-        # stale bundle to the marketplace.
+        # The committed mcp-server/ MUST match what the current source
+        # produces. Drift means a contributor forgot to re-bundle before
+        # committing. Fail CI rather than silently shipping a stale bundle to
+        # the marketplace.
         # source: cross-audit follow-through — Phase 4 strategy-wiring
         # round, public-readiness baseline (2026-04).
+        #
+        # The whole directory, not just index.js: `pnpm bundle` also stamps
+        # mcp-server/package.json with the release version, and that file is
+        # what the server reads to answer `initialize`. Diffing only index.js
+        # would let the advertised version drift again — which is exactly how
+        # it reached 0.4.0 against a 0.6.1 release.
         run: |
-          if ! git diff --exit-code -- mcp-server/index.js; then
-            echo "::error::mcp-server/index.js is out of date. Run 'pnpm bundle' locally and commit the result."
+          if ! git diff --exit-code -- mcp-server/; then
+            echo "::error::mcp-server/ is out of date. Run 'pnpm bundle' locally and commit the result."
             exit 1
           fi
 
