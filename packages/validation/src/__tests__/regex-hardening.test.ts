@@ -8,83 +8,15 @@
  *    bash-function pattern matched `test_foo` inside `mytest_foo`. Those get
  *    ordinary contract tests, each of which fails on the pre-fix code.
  *
- *  - COMPLEXITY: the three polynomial patterns are pinned by GROWTH, not by a
- *    wall-clock threshold. Asserting "under N ms" on a shared CI runner is a
- *    flake generator; asserting that doubling the input does not quadruple the
- *    time is the actual property (quadratic → ~4x, linear → ~1x per doubling),
- *    and it holds regardless of how loaded the machine is. The headroom below
- *    is deliberately wide — it is there to catch a reintroduced O(n²), not to
- *    measure performance.
+ *  - COMPLEXITY: the growth assertions that pin those same patterns as
+ *    sub-quadratic live in `regex-hardening.perf.ts`, NOT here. They measure
+ *    wall-clock ratios, and a wall-clock ratio taken while 96 other test
+ *    files compete for the CPU is not a measurement of the code. See that
+ *    file's header for what moved and why.
  */
 
 import { describe, expect, it } from "vitest";
 import { validateSection } from "../index.js";
-
-/**
- * Floor for a single sample, in milliseconds. Below this, two timings are
- * mostly clock granularity and their quotient carries no information.
- */
-const MIN_SAMPLE_MS = 0.5;
-
-/**
- * Median of the per-pair growth ratio between `large` and `small`.
- *
- * The pair is timed BACK-TO-BACK, and that is the whole point. The previous
- * implementation timed every `small` sample, then every `large` sample, so any
- * ambient-load drift between the two blocks landed entirely in the numerator.
- * With 89 test files running in parallel that drift is routine, and it made
- * this assertion fail on an UNCHANGED tree: `main` produced ratio 3.42 (ceiling
- * 2.5) on one full-suite run and passed the next two, with no quadratic pattern
- * anywhere in the diff. The file header claimed the ratio "holds regardless of
- * how loaded the machine is"; that is true of the property and was false of the
- * measurement.
- *
- * Timing both sizes adjacently puts them under the same ambient load, so the
- * load term is common to numerator and denominator and cancels. The median over
- * pairs then discards any single descheduled pair. Growth in the INPUT is what
- * survives: a quadratic pattern still lands near 4x in every pair, because that
- * factor comes from the input doubling and not from the scheduler.
- *
- * source: measured pre-fix growth of the three patterns in this repo
- * (each ~3.9–4.0x per doubling; see the comments at their definitions).
- */
-function medianGrowthRatio(run: (input: string) => void, small: string, large: string, pairs = 7): number {
-  const ratios: number[] = [];
-  for (let i = 0; i < pairs; i++) {
-    const startedSmall = performance.now();
-    run(small);
-    const elapsedSmall = performance.now() - startedSmall;
-
-    const startedLarge = performance.now();
-    run(large);
-    const elapsedLarge = performance.now() - startedLarge;
-
-    ratios.push(elapsedLarge / Math.max(elapsedSmall, MIN_SAMPLE_MS));
-  }
-  ratios.sort((a, b) => a - b);
-  return ratios[Math.floor(ratios.length / 2)];
-}
-
-/**
- * Assert that doubling the input length does not multiply the time by ~4.
- *
- * A quadratic pattern lands near 4.0; a linear one near 1.0. The 2.5 ceiling
- * sits between them with room for scheduler noise on a loaded runner.
- * source: measured pre-fix growth of the three patterns in this repo (each
- * ~3.9–4.0x per doubling; see the comments at their definitions).
- */
-const QUADRATIC_GROWTH_CEILING = 2.5;
-
-function expectSubQuadratic(build: (n: number) => string, section: Parameters<typeof validateSection>[1]): void {
-  const base = 4000;
-  const small = build(base);
-  const large = build(base * 2);
-  // Warm the JIT on BOTH sizes so no first sample carries compilation cost.
-  validateSection(small, section);
-  validateSection(large, section);
-  const ratio = medianGrowthRatio((input) => validateSection(input, section), small, large);
-  expect(ratio).toBeLessThan(QUADRATIC_GROWTH_CEILING);
-}
 
 describe("NFR operator matching — js/regex/duplicate-in-character-class", () => {
   // The old class `[:<≤<=]` is a SET, so the two-character `<=` was
@@ -168,34 +100,6 @@ describe("bash test-function detection — word boundary", () => {
 // correct (it deletes an unreachable alternative and the ambiguity CodeQL
 // flagged), but the hazard it removes is latent, not live, and pretending
 // otherwise with a green-either-way test would be worse than saying so.
-describe("polynomial-ReDoS patterns stay sub-quadratic", () => {
-  it("modifier runs on a declaration line (typeStartPattern)", () => {
-    expectSubQuadratic(
-      (n) => ["```kotlin", "abstract ".repeat(n), "```"].join("\n"),
-      "technical_specification",
-    );
-  });
-
-  it("identifier runs in test code (bash function pattern)", () => {
-    expectSubQuadratic((n) => ["| test_a |", "```bash", "test".repeat(n), "```"].join("\n"), "testing");
-  });
-
-  // The three witnesses below are CodeQL's own, taken verbatim from the
-  // js/polynomial-redos report. Each measured 3.9x–4.0x per doubling before
-  // the fix; the shared `findPatternViolations` call site was the reported
-  // location, but the quadratic lived in the patterns passed to it.
-  it("near-miss runs in one SP table cell (sp_not_in_fr_table)", () => {
-    expectSubQuadratic((n) => "|storypoint" + "storypoints".repeat(n), "requirements");
-  });
-
-  it("comment runs in an unterminated test body (no_placeholder_tests)", () => {
-    expectSubQuadratic((n) => "func testa(){{//TODO" + "//TODO".repeat(n), "testing");
-  });
-
-  it("space runs after a matrix row's third cell (no_placeholder_tests)", () => {
-    expectSubQuadratic((n) => "|testa||" + " ".repeat(n), "testing");
-  });
-});
 
 describe("SP-in-FR-table detection is row-scoped", () => {
   const spViolations = (content: string) =>

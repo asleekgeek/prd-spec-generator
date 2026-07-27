@@ -9,6 +9,7 @@
     "bundle": "esbuild packages/mcp-server/dist/index.js --bundle --platform=node --target=node20 --format=esm --external:better-sqlite3 --outfile=mcp-server/index.js && chmod +x mcp-server/index.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:perf": "vitest run --config vitest.perf.config.ts",
     "check:docs": "node scripts/check-doc-claims.mjs",
     "test:watch": "vitest",
     "test:external-judge": "node --test scripts/external-judge/__tests__/*.test.mjs",

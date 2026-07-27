@@ -137,6 +137,13 @@ jobs:
         # legs doubles the cost for an identical number.
         run: ${{ matrix.node-version == '20.x' && 'pnpm test:coverage' || 'pnpm test' }}
 
+      - name: Test (growth / anti-ReDoS, run alone)
+        # Timing-sensitive assertions, deliberately outside the parallel suite:
+        # a growth ratio measured while ~97 files compete for the CPU measures
+        # the scheduler. Run once, on the Node 20 leg, with fileParallelism off.
+        if: matrix.node-version == '20.x'
+        run: pnpm test:perf
+
       - name: Test (external-judge harness)
         # scripts/external-judge runs on node:test, not vitest, so `pnpm test`
         # never touched it — the script existed in package.json and no
