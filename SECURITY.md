@@ -99,7 +99,9 @@ single-maintainer project clears by doing better engineering.
 The badge itself **is** shown, as of 2026-07-27, because it now reports an
 achieved level rather than an unfinished self-assessment. The project earned the
 **passing** badge that day at 100% of the passing criteria (67 of 67: 56 met,
-11 not applicable). The earlier position here was that a badge reading
+11 not applicable) and the **silver** badge the same day at 100% of the silver
+criteria (55 of 55: 41 met, 9 not applicable, 5 unmet-with-reason). The earlier
+position here was that a badge reading
 `in progress — 0%` is a worse signal than no badge, since it advertises an
 incomplete questionnaire as though it were an assurance; that objection does not
 apply to a level that was actually earned, and it still applies to gold, which
