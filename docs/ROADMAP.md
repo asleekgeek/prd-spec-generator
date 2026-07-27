@@ -42,10 +42,10 @@ script, and the data it was computed from. Where data is still thin, gates stay
 
 ## 2. OpenSSF Best Practices: gold as far as one maintainer can take it, plus hardening
 
-**Status:** the **passing** badge was earned on 2026-07-27 at 100% of the passing criteria.
-Silver stands at 15%: the answers exist but the badge site applies them one level at a time, so
-the silver level still has to be re-run against the file. Gold is a prerequisite chain behind
-that (`achieve_silver`).
+**Status:** the **passing** and **silver** badges were both earned on 2026-07-27, each at 100%
+of its criteria (passing 67 of 67; silver 55 of 55: 41 met, 9 not applicable, 5
+unmet-with-reason). Gold stands at 30% and is blocked on `contributors_unassociated` and
+`two_person_review`, which need a second person rather than better engineering.
 
 Every passing and silver criterion is answered in
 [`.bestpractices.json`](../.bestpractices.json) at the repository root, which bestpractices.dev
