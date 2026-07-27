@@ -2,7 +2,9 @@
  * Contracts for the Cortex MCP.
  * Cortex owns persistent memory; we never store anything ourselves.
  *
- * Tool names match the cortex MCP plugin (mcp__plugin_cortex_cortex__*).
+ * Tool names match the Cortex MCP plugin (mcp__plugin_hypermnesia-mcp_cortex__*).
+ * The prefix carries both the plugin name and the server key; Cortex v4.15.0
+ * renamed the plugin cortex -> hypermnesia-mcp and kept the server key cortex.
  */
 
 import { z } from "zod";
