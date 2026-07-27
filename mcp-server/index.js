@@ -33064,8 +33064,8 @@ var StdioServerTransport = class {
 };
 
 // packages/mcp-server/dist/index.js
-import { readFileSync as readFileSync4, existsSync as existsSync6 } from "node:fs";
-import { join as join9, dirname as dirname2 } from "node:path";
+import { readFileSync as readFileSync5, existsSync as existsSync6 } from "node:fs";
+import { join as join10, dirname as dirname2 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // packages/core/dist/domain/prd-context.js
@@ -92039,30 +92039,55 @@ function instructions(profile) {
   return profile === "agent" ? AGENT_INSTRUCTIONS : FULL_INSTRUCTIONS;
 }
 
+// packages/mcp-server/dist/server-version.js
+import { readFileSync as readFileSync4 } from "node:fs";
+import { join as join9 } from "node:path";
+var UNRESOLVED_VERSION = "0.0.0-unresolved";
+function readVersion(manifestPath) {
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync4(manifestPath, "utf-8"));
+  } catch {
+    return null;
+  }
+  const version4 = parsed.version;
+  return typeof version4 === "string" && version4.length > 0 ? version4 : null;
+}
+function resolveServerVersion(runtimeDir, pluginRoot) {
+  const candidates = [join9(runtimeDir, "package.json"), join9(pluginRoot, "package.json")];
+  for (const candidate of candidates) {
+    const version4 = readVersion(candidate);
+    if (version4 !== null) {
+      return version4;
+    }
+  }
+  return UNRESOLVED_VERSION;
+}
+
 // packages/mcp-server/dist/index.js
 var __dirname = dirname2(fileURLToPath(import.meta.url));
-var PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT ?? join9(__dirname, "..", "..", "..");
+var PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT ?? join10(__dirname, "..", "..", "..");
 function loadSkillConfig() {
   const configPaths = [
     process.env.PRD_GEN_SKILL_CONFIG,
-    join9(PLUGIN_ROOT, "skill-config.json"),
-    join9(PLUGIN_ROOT, "packages", "skill", "skill-config.json")
+    join10(PLUGIN_ROOT, "skill-config.json"),
+    join10(PLUGIN_ROOT, "packages", "skill", "skill-config.json")
   ].filter(Boolean);
   for (const p of configPaths) {
     if (existsSync6(p)) {
-      return JSON.parse(readFileSync4(p, "utf-8"));
+      return JSON.parse(readFileSync5(p, "utf-8"));
     }
   }
   return { version: "2.0.0", status: "config_not_found" };
 }
 function loadSkillMd() {
   const skillPaths = [
-    join9(PLUGIN_ROOT, "skills", "prd-spec-generator", "SKILL.md"),
-    join9(PLUGIN_ROOT, "packages", "skill", "SKILL.md")
+    join10(PLUGIN_ROOT, "skills", "prd-spec-generator", "SKILL.md"),
+    join10(PLUGIN_ROOT, "packages", "skill", "SKILL.md")
   ];
   for (const p of skillPaths) {
     if (existsSync6(p)) {
-      return readFileSync4(p, "utf-8");
+      return readFileSync5(p, "utf-8");
     }
   }
   return "SKILL.md not found";
@@ -92070,7 +92095,10 @@ function loadSkillMd() {
 var ACTIVE_PROFILE = resolveProfile(process.argv.slice(2), process.env);
 var server = new McpServer({
   name: "prd-gen",
-  version: "0.4.0"
+  // Read from the shipped package.json, never written down here — the
+  // literal that used to sit on this line drifted to 0.4.0 while the
+  // released artifact was 0.6.1. See server-version.ts.
+  version: resolveServerVersion(__dirname, PLUGIN_ROOT)
 }, {
   // Per-profile initialize instructions (issue #28 criterion 4).
   instructions: instructions(ACTIVE_PROFILE)

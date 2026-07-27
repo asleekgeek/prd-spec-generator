@@ -43,6 +43,7 @@ import {
   checkReliabilityHealth,
   closeReliabilityRepo,
 } from "./reliability-wiring.js";
+import { resolveServerVersion } from "./server-version.js";
 
 // ─── Reliability wiring (D2.4 / D2.6) ───────────────────────────────────────
 // Re-exported so pipeline-tools and other callers can inject the provider into
@@ -103,7 +104,10 @@ const ACTIVE_PROFILE: ToolProfile = resolveProfile(process.argv.slice(2), proces
 const server = new McpServer(
   {
     name: "prd-gen",
-    version: "0.4.0",
+    // Read from the shipped package.json, never written down here — the
+    // literal that used to sit on this line drifted to 0.4.0 while the
+    // released artifact was 0.6.1. See server-version.ts.
+    version: resolveServerVersion(__dirname, PLUGIN_ROOT),
   },
   {
     // Per-profile initialize instructions (issue #28 criterion 4).
