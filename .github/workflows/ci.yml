@@ -157,6 +157,20 @@ jobs:
         # offline (the no-credentials path returns "skipped").
         run: pnpm run test:external-judge
 
+      - name: Documented claims match the suite
+        # The advertised test count is quoted in eight user-facing places. The
+        # gate that checks it ran at release time only, so main could carry a
+        # stale claim for as long as no release happened — and did: a693e15
+        # moved the 5 growth tests into the perf project, the default suite went
+        # 1496 -> 1491, and every badge and description kept claiming 1496 until
+        # 2026-07-27. Release time is too late for a number a reader sees on the
+        # README; check it where the drift is introduced.
+        #
+        # Node 20 leg only: the count is a property of the suite, not of the
+        # runtime, and the script runs `vitest run` itself.
+        if: matrix.node-version == '20.x'
+        run: pnpm check:docs
+
   mcpb-smoke:
     name: mcpb smoke
     runs-on: ubuntu-latest
