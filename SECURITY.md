@@ -86,8 +86,8 @@ this team size, while the approval count honestly reports zero rather than
 laundering a self-approval into a green metric. This is revisited the moment a
 second maintainer joins.
 
-**`CIIBestPracticesID` is declined for the same structural reason, and no badge
-is displayed.** Scorecard's `checks/evaluation/cii_best_practices.go` awards its
+**`CIIBestPracticesID` is declined for the same structural reason.** Scorecard's
+`checks/evaluation/cii_best_practices.go` awards its
 maximum only for the **gold** badge (silver 7, passing 5, in progress 2) and
 reports a finding at any score below maximum. Gold is not reachable here: it
 requires `contributors_unassociated` (at least two significant contributors not
@@ -96,11 +96,26 @@ proposed modifications reviewed by someone other than their author). Both need a
 second person, which is the same wall as `CodeReviewID` and not one a
 single-maintainer project clears by doing better engineering.
 
-Since gold is out of reach, the badge is deliberately **not shown**. A badge
-reading `in progress — 0%` is a worse signal than no badge: it advertises an
-unfinished self-assessment as though it were an assurance, and the reader has to
-know the tier system to tell those apart. The honest artifacts are the ones
-above — an empty audit ignore list, integrity-verified provisioning,
+The badge itself **is** shown, as of 2026-07-27, because it now reports an
+achieved level rather than an unfinished self-assessment. The project earned the
+**passing** badge that day at 100% of the passing criteria (67 of 67: 56 met,
+11 not applicable). The earlier position here was that a badge reading
+`in progress — 0%` is a worse signal than no badge, since it advertises an
+incomplete questionnaire as though it were an assurance; that objection does not
+apply to a level that was actually earned, and it still applies to gold, which
+this project does not claim.
+
+The answers behind the badge are not only in the web form. Every passing and
+silver criterion is answered in [`.bestpractices.json`](.bestpractices.json) at
+the repository root, which bestpractices.dev reads directly from the default
+branch, so each claim sits in version control next to the evidence it cites and
+changes to it are reviewable. Five silver criteria are answered `Unmet` with
+their reasons rather than argued into a pass (`dco`, `bus_factor`,
+`internationalization`, `version_tags_signed`, `hardening`); all are SHOULD or
+SUGGESTED, and no MUST is unmet at either level.
+
+The badge is still not the load-bearing artifact. The honest ones are the same
+as before — an empty audit ignore list, integrity-verified provisioning,
 least-privilege tokens, branch protection, property-based tests — each of which
 a reader can verify from this repository rather than from a shield.
 

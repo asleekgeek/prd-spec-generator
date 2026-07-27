@@ -13,6 +13,7 @@
   <img src="https://img.shields.io/badge/MCP_Tools-17-8A2BE2" alt="17 MCP tools">
   <img src="https://img.shields.io/badge/Validators-Hard_Output_Rules-red" alt="Hard Output Rules">
   <img src="https://img.shields.io/badge/Calibration-Closed_Loop-success" alt="Closed-loop reliability calibration">
+  <a href="https://www.bestpractices.dev/projects/13832"><img src="https://www.bestpractices.dev/projects/13832/badge" alt="OpenSSF Best Practices"></a>
 </p>
 
 <p align="center">
