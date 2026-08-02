@@ -10,7 +10,7 @@
 ## Review
 
 - `pnpm build`, `pnpm bundle`, and `pnpm lint` pass.
-- `pnpm test` passes all 1,500 Vitest tests; the portable distribution suite
+- `pnpm test` passes all 1,503 Vitest tests; the portable distribution suite
   adds 3 passing Node contract tests outside that documented count.
 - Both portable skills and the Codex plugin pass the official validators.
 - The existing Claude manifest still selects no profile, preserving the
