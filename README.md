@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License">
   <img src="https://img.shields.io/badge/TypeScript-7.0+-3178c6.svg" alt="TypeScript 7.0+">
   <img src="https://img.shields.io/badge/Node-20.x_·_22.x-339933.svg" alt="Node 20/22">
-  <img src="https://img.shields.io/badge/Tests-1500_passing-brightgreen" alt="1500 passing">
+  <img src="https://img.shields.io/badge/Tests-1503_passing-brightgreen" alt="1503 passing">
   <img src="https://img.shields.io/badge/Packages-10-orange" alt="10 packages">
   <img src="https://img.shields.io/badge/MCP_Tools-17-8A2BE2" alt="17 MCP tools">
   <img src="https://img.shields.io/badge/Validators-Hard_Output_Rules-red" alt="Hard Output Rules">
@@ -33,7 +33,7 @@ Every AI agent that drafts a PRD eventually invents a function that doesn't exis
 
 **prd-spec-generator** is a TypeScript MCP server that fixes this at the structural level. The pipeline is a stateless reducer (`step(state, result?) → next_state, action`) driven by a host (Claude Code or any MCP-speaking agent). Sections are produced one at a time, validated by deterministic Hard Output Rules before the host ever sees them, and every load-bearing claim is judged by a panel of genius reasoning agents drawn from `zetetic-team-subagents` against the codebase graph from `automatised-pipeline`. The loop is closed: per-judge reliability is calibrated from history, retry budgets are derived from survival statistics, KPI gates are tuned against frozen baselines, and held-out partitions are mechanically sealed so no calibration result can be peeked at before evaluation.
 
-**10 packages. 17 MCP tools. 20 pipeline steps (11 PRD generation + 9 opt-in implementation). Multi-judge verification with consensus. Closed-loop calibration with externally-grounded falsifiers. 1500 tests. Every numeric constant traces to a citation, a benchmark, or a `// source: provisional heuristic` admission.**
+**10 packages. 17 MCP tools. 20 pipeline steps (11 PRD generation + 9 opt-in implementation). Multi-judge verification with consensus. Closed-loop calibration with externally-grounded falsifiers. 1503 tests. Every numeric constant traces to a citation, a benchmark, or a `// source: provisional heuristic` admission.**
 
 ---
 
@@ -135,7 +135,7 @@ cd prd-spec-generator
 pnpm install --frozen-lockfile
 pnpm build      # builds all 9 buildable packages via tsc
 pnpm bundle     # produces the standalone mcp-server/index.js
-pnpm test       # 1500 tests (vitest workspace, all packages; live MCP
+pnpm test       # 1503 tests (vitest workspace, all packages; live MCP
                 # integration env-gated by AIPRD_PIPELINE_BIN)
 ```
 
@@ -161,44 +161,53 @@ offline.
 
 ### Use with other MCP hosts
 
-Honest scoping first. The 17 tools register on any MCP host — the server
-is a plain stdio process — but the **full pipeline is host-dependent**: the
-reducer returns actions (`ask_user`, `spawn_subagents`, `write_file`) that
-assume a host which executes them and feeds results back. Claude Code (via
-the plugin + `/generate-prd` skill) is the only host that does this today.
-On other hosts, driving `start_pipeline`/`submit_action_result` by hand is
-possible but not the supported experience.
+Honest scoping first. The **full pipeline is host-dependent**: the reducer
+returns actions (`ask_user`, `spawn_subagents`, `write_file`) that assume a
+host which executes them and feeds results back. Claude Code (via the plugin +
+`/generate-prd` skill) remains the only packaged host for that workflow.
 
-What **is** worth installing everywhere: the deterministic validation
-surface — a spec linter with no LLM in the loop.
+Codex and Gemini instead receive the portable **Spec Verifier**: a no-LLM
+surface with exactly two deterministic tools and the same `audit-prd` and
+`validate-spec` skills:
 
 - `validate_prd_section` — Hard Output Rules against a single section
 - `validate_prd_document` — cross-section checks (SP/AC/FR/test traceability)
 
-Plus the direct-consumption tools that need no pipeline run:
-`plan_section_verification`, `plan_document_verification`,
-`conclude_verification`, `coordinate_context_budget`, and the diagnostics
-surface.
+Install it in Codex from the repository marketplace:
 
-Setup: clone the repo — the bundled `mcp-server/index.js` is committed, so
-no build is needed — and point your host at it with `node`. Replace
-`/abs/path` with the clone location.
+```bash
+codex plugin marketplace add cdeust/prd-spec-generator
+codex plugin add prd-spec-generator@prd-spec-generator-marketplace
+```
+
+Install the same package as a Gemini CLI extension:
+
+```bash
+gemini extensions install https://github.com/cdeust/prd-spec-generator
+```
+
+Both manifests launch `mcp-server/index.js` with `--profile verifier`. The
+existing Claude manifest passes no profile and therefore retains the default
+17-tool `full` surface.
+
+A zero-violation result means that the document satisfies the implemented
+structural rules. It does **not** prove factual accuracy, product value,
+implementation feasibility, security, or semantic correctness.
+
+For an un-packaged MCP host, clone the repository and select the same narrow
+profile explicitly. Replace `/abs/path` with the clone location.
 
 ```bash
 git clone https://github.com/cdeust/prd-spec-generator.git /abs/path/prd-spec-generator
-```
-
-**Gemini CLI:**
-
-```bash
-gemini mcp add prd-spec node /abs/path/prd-spec-generator/mcp-server/index.js
+cd /abs/path/prd-spec-generator/mcp-server
+npm ci --omit=dev
 ```
 
 **OpenAI Codex CLI** (`~/.codex/config.toml`, shared with the ChatGPT
 desktop app and Codex IDE extension):
 
 ```bash
-codex mcp add prd-spec -- node /abs/path/prd-spec-generator/mcp-server/index.js
+codex mcp add prd-spec -- node /abs/path/prd-spec-generator/mcp-server/index.js --profile verifier
 ```
 
 **Cursor** (`.cursor/mcp.json`) and **Windsurf**
@@ -209,7 +218,11 @@ codex mcp add prd-spec -- node /abs/path/prd-spec-generator/mcp-server/index.js
   "mcpServers": {
     "prd-spec": {
       "command": "node",
-      "args": ["/abs/path/prd-spec-generator/mcp-server/index.js"]
+      "args": [
+        "/abs/path/prd-spec-generator/mcp-server/index.js",
+        "--profile",
+        "verifier"
+      ]
     }
   }
 }
@@ -223,7 +236,11 @@ codex mcp add prd-spec -- node /abs/path/prd-spec-generator/mcp-server/index.js
     "prd-spec": {
       "type": "stdio",
       "command": "node",
-      "args": ["/abs/path/prd-spec-generator/mcp-server/index.js"]
+      "args": [
+        "/abs/path/prd-spec-generator/mcp-server/index.js",
+        "--profile",
+        "verifier"
+      ]
     }
   }
 }

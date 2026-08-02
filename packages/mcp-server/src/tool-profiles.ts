@@ -8,10 +8,12 @@
  * `full` surface (non-goal: removing tools — everything stays reachable under
  * `full`).
  *
- * Two profiles:
+ * Three profiles:
  *   - `full`  — every registered tool. **The default.**
  *   - `agent` — the agent-facing set: every tool except the internal
  *     diagnostics/telemetry tools listed in {@link INTERNAL_TOOL_NAMES}.
+ *   - `verifier` — the two deterministic PRD validators only. This narrow,
+ *     host-neutral surface is used by the Codex and Gemini distributions.
  *
  * Default = `full` (documented divergence). Issue #28 criterion 3 asks the
  * default to be the agent-facing set. This wave keeps `full` the default
@@ -25,7 +27,7 @@
  * `full` (matches the `PRD_GEN_*` env convention, e.g. `PRD_GEN_SKILL_CONFIG`).
  */
 
-export const PROFILES = ["full", "agent"] as const;
+export const PROFILES = ["full", "agent", "verifier"] as const;
 export type ToolProfile = (typeof PROFILES)[number];
 
 export const PROFILE_FLAG = "--profile";
@@ -48,21 +50,30 @@ export const INTERNAL_TOOL_NAMES = [
 
 const INTERNAL_SET = new Set<string>(INTERNAL_TOOL_NAMES);
 
+/** Deterministic, read-only tools exposed by the portable verifier profile. */
+export const VERIFIER_TOOL_NAMES = [
+  "validate_prd_section",
+  "validate_prd_document",
+] as const;
+
+const VERIFIER_SET = new Set<string>(VERIFIER_TOOL_NAMES);
+
 /** Whether `toolName` is advertised under `profile`. */
 export function isAllowed(profile: ToolProfile, toolName: string): boolean {
   if (profile === "full") return true;
-  return !INTERNAL_SET.has(toolName);
+  if (profile === "agent") return !INTERNAL_SET.has(toolName);
+  return VERIFIER_SET.has(toolName);
 }
 
 /**
- * Parse a profile name. Accepts exactly `full` and `agent`.
+ * Parse a profile name. Accepts exactly the names in {@link PROFILES}.
  * @throws Error naming the accepted values for any other input.
  */
 export function parseProfile(value: string): ToolProfile {
   if ((PROFILES as readonly string[]).includes(value)) {
     return value as ToolProfile;
   }
-  throw new Error(`invalid profile '${value}': expected 'full' or 'agent'`);
+  throw new Error(`invalid profile '${value}': expected ${PROFILES.join(", ")}`);
 }
 
 /**
@@ -95,7 +106,7 @@ function flagValueOf(argv: readonly string[]): string | undefined {
     if (arg === PROFILE_FLAG) {
       const next = argv[i + 1];
       if (next === undefined) {
-        throw new Error(`${PROFILE_FLAG} requires a value: 'full' or 'agent'`);
+        throw new Error(`${PROFILE_FLAG} requires a value: ${PROFILES.join(", ")}`);
       }
       found = next;
       i++;
@@ -135,6 +146,17 @@ const AGENT_INSTRUCTIONS =
   "this profile; restart with --profile full to expose them. The " +
   "run_prd_pipeline and verify_prd_document prompts guide the flow.";
 
+const VERIFIER_INSTRUCTIONS =
+  "prd-gen — deterministic PRD structure verifier ('verifier' profile). " +
+  "Only validate_prd_section and validate_prd_document are exposed. These " +
+  "tools run Hard Output Rules and cross-section consistency checks without " +
+  "LLM calls. A passing report establishes structural conformance to those " +
+  "rules; it does not establish factual accuracy, implementation feasibility, " +
+  "or semantic correctness. Restart with --profile full for the complete " +
+  "pipeline or --profile agent for its agent-facing subset.";
+
 export function instructions(profile: ToolProfile): string {
-  return profile === "agent" ? AGENT_INSTRUCTIONS : FULL_INSTRUCTIONS;
+  if (profile === "agent") return AGENT_INSTRUCTIONS;
+  if (profile === "verifier") return VERIFIER_INSTRUCTIONS;
+  return FULL_INSTRUCTIONS;
 }

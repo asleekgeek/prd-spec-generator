@@ -1,0 +1,9 @@
+interface:
+  display_name: "Audit PRD"
+  short_description: "Audit a PRD with deterministic rules"
+  default_prompt: "Use $audit-prd to audit this PRD structurally."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "prd-spec-verifier"
+      description: "Deterministic PRD validation tools"

@@ -163,6 +163,9 @@ jobs:
         # offline (the no-credentials path returns "skipped").
         run: pnpm run test:external-judge
 
+      - name: Test portable Codex and Gemini packaging
+        run: pnpm run test:portable
+
       - name: Documented claims match the suite
         # The advertised test count is quoted in eight user-facing places. The
         # gate that checks it ran at release time only, so main could carry a
@@ -220,6 +223,21 @@ jobs:
         # expected count. "the file exists" would have passed while the server
         # was unstartable.
         run: bash scripts/release/smoke-mcpb.sh
+
+      - name: Start the shipped Codex and Gemini verifier commands
+        # Reads command + args from each host manifest, launches the real
+        # ensure-deps.sh path, completes initialize/tools-list, then calls the
+        # deterministic verifier. This guards the portable path separately
+        # from the Claude-oriented .mcpb smoke above.
+        run: pnpm run test:portable:runtime
+
+      - name: Run pinned OpenAI Codex validators
+        run: |
+          python3 -m pip install --disable-pip-version-check PyYAML==6.0.3
+          bash scripts/run-codex-validators.sh \
+            . skills/audit-prd skills/validate-spec
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   dependency-review:
     name: dependency review (PR)

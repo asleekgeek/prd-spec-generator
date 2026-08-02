@@ -1,3 +1,24 @@
+# Portable Spec Verifier (Codex + Gemini, 2026-08-02)
+
+- [x] Preserve the default `full` profile and the Claude plugin contract.
+- [x] Add an opt-in `verifier` profile exposing only deterministic PRD validators.
+- [x] Package the same verifier MCP server and skills for Codex and Gemini CLI.
+- [x] Add profile-gating, distribution, manifest, and skill validation tests.
+- [x] Rebuild committed `dist/` and `mcp-server/` artifacts.
+- [x] Document scope, installation, validation evidence, and residual risks.
+
+## Review
+
+- `pnpm build`, `pnpm bundle`, and `pnpm lint` pass.
+- `pnpm test` passes all 1,503 Vitest tests; the portable distribution suite
+  adds 3 passing Node contract tests outside that documented count.
+- Both portable skills and the Codex plugin pass the official validators.
+- The existing Claude manifest still selects no profile, preserving the
+  17-tool `full` default. The packaged launchers use Bash, as documented, so a
+  Windows host needs a Bash-compatible shell.
+
+---
+
 # Fix e2e gaps (run run_mrlqa0aj_u2rh15, 2026-07-15) — rentabilité + fonctionnalité
 
 Réf. preuve : session-optimizer/prd-output/run_mrlq/10-verification-report.md + mémoire Cortex 4334566.

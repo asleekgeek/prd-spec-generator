@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Portable Spec Verifier for Codex and Gemini CLI.** Both host manifests now
+  launch the same opt-in `verifier` profile, which advertises and accepts only
+  `validate_prd_section` and `validate_prd_document`. The shared `audit-prd`
+  and `validate-spec` skills preserve the boundary between deterministic
+  structural conformance and semantic or factual correctness. The existing
+  Claude manifest still selects no profile, so its default 17-tool `full`
+  surface is unchanged. Distribution tests pin manifest versions, launch
+  arguments, supported skill frontmatter, and that Claude compatibility
+  invariant.
+
 ### Fixed
 
 - **The server advertised the wrong version to every host that connected.**

@@ -11,18 +11,28 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it } from "vitest";
 
 import { registerPrompts } from "../mcp-prompts.js";
+import { isAllowed } from "../tool-profiles.js";
 
 // Tools the prompts reference, with descriptions that are the source of truth
 // for the prompt step summaries.
 const TOOLS: Record<string, string> = {
+  get_config: "Get the full skill configuration.",
+  read_skill_config: "Read the active skill configuration.",
+  check_health: "Check server health.",
+  get_prd_context_info: "Describe a PRD context.",
+  list_available_strategies: "List generation strategies.",
+  validate_prd_section: "Run deterministic validation on one PRD section.",
+  validate_prd_document: "Run full document validation including cross-section checks.",
+  get_quality_history: "Read historical quality scores.",
+  get_strategy_effectiveness: "Read strategy effectiveness.",
   coordinate_context_budget: "Calculate token budget allocation for PRD generation. Call before generating.",
+  map_failure_to_retrieval: "Map validation failures to retrieval queries.",
   start_pipeline: "Initialize a pipeline run. Returns the first NextAction to execute.",
   get_pipeline_state: "Read the current pipeline state by run_id.",
   submit_action_result: "Feed an ActionResult to the reducer. Returns the next action.",
+  plan_section_verification: "Emit JudgeRequest[] for one section.",
   plan_document_verification: "Emit JudgeRequest[] across all sections of the document.",
   conclude_verification: "Aggregate JudgeVerdict[] into a VerificationReport.",
-  validate_prd_document: "Run full document validation including cross-section checks.",
-  get_config: "Get the full skill configuration.",
 };
 
 function buildServer(): { server: McpServer; handles: Record<string, RegisteredTool> } {
@@ -115,6 +125,28 @@ describe("profile gate: disable() hides AND rejects (criterion 5)", () => {
     // A still-enabled tool remains listed.
     const { tools: after } = await client.listTools();
     expect(after.map((t) => t.name)).toContain("start_pipeline");
+    await client.close();
+  });
+
+  it("verifier advertises only its two validators and rejects an excluded call", async () => {
+    const { server, handles } = buildServer();
+    for (const [name, handle] of Object.entries(handles)) {
+      if (!isAllowed("verifier", name)) handle.disable();
+    }
+    const client = await connect(server);
+
+    const { tools } = await client.listTools();
+    expect(tools.map((tool) => tool.name).sort()).toEqual([
+      "validate_prd_document",
+      "validate_prd_section",
+    ]);
+
+    const call = (await client.callTool({ name: "start_pipeline", arguments: {} })) as {
+      isError?: boolean;
+      content: Array<{ text: string }>;
+    };
+    expect(call.isError).toBe(true);
+    expect(call.content[0].text).toContain("disabled");
     await client.close();
   });
 });

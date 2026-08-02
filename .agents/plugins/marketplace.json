@@ -1,0 +1,20 @@
+{
+  "name": "prd-spec-generator-marketplace",
+  "interface": {
+    "displayName": "PRD Spec Generator"
+  },
+  "plugins": [
+    {
+      "name": "prd-spec-generator",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
