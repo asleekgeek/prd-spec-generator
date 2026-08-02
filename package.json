@@ -11,6 +11,7 @@
     "test:coverage": "vitest run --coverage",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:portable": "node --test scripts/portable-distribution.test.mjs",
+    "test:portable:runtime": "node scripts/smoke-portable-hosts.mjs",
     "check:docs": "node scripts/check-doc-claims.mjs",
     "test:watch": "vitest",
     "test:external-judge": "node --test scripts/external-judge/__tests__/*.test.mjs",
