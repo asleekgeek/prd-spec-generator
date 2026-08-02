@@ -1,0 +1,9 @@
+interface:
+  display_name: "Validate Spec"
+  short_description: "Validate one PRD section structurally"
+  default_prompt: "Use $validate-spec to validate this PRD section."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "prd-spec-verifier"
+      description: "Deterministic PRD validation tools"

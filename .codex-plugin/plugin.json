@@ -1,0 +1,47 @@
+{
+  "name": "prd-spec-generator",
+  "version": "0.6.1",
+  "description": "Deterministic PRD structure verification for Codex, backed by the prd-spec-generator MCP server.",
+  "author": {
+    "name": "Clement Deust",
+    "email": "admin@ai-architect.tools",
+    "url": "https://github.com/cdeust"
+  },
+  "homepage": "https://github.com/cdeust/prd-spec-generator",
+  "repository": "https://github.com/cdeust/prd-spec-generator",
+  "license": "MIT",
+  "keywords": [
+    "prd",
+    "specification",
+    "validation",
+    "mcp",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "mcpServers": {
+    "prd-spec-verifier": {
+      "command": "bash",
+      "args": [
+        "${PLUGIN_ROOT}/bin/ensure-deps.sh",
+        "${PLUGIN_ROOT}",
+        "--profile",
+        "verifier"
+      ]
+    }
+  },
+  "interface": {
+    "displayName": "PRD Spec Verifier",
+    "shortDescription": "Deterministic PRD structure checks",
+    "longDescription": "Audit PRD sections and whole documents with deterministic Hard Output Rules and cross-section consistency checks.",
+    "developerName": "Clement Deust",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read"
+    ],
+    "websiteURL": "https://github.com/cdeust/prd-spec-generator",
+    "defaultPrompt": [
+      "Audit this PRD for structural violations.",
+      "Validate this specification section."
+    ]
+  }
+}

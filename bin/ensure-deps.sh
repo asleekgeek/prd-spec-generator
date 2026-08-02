@@ -27,7 +27,8 @@
 #
 set -euo pipefail
 
-ROOT="${1:?usage: ensure-deps.sh <plugin-root>}"
+ROOT="${1:?usage: ensure-deps.sh <plugin-root> [server-args...]}"
+shift
 SERVER_DIR="${ROOT}/mcp-server"
 
 # ajv is a hard (static) dependency of the bundle; its presence is the
@@ -57,4 +58,7 @@ if [[ ! -d "${SERVER_DIR}/node_modules/ajv" ]]; then
     --omit=dev --no-audit --no-fund --loglevel=error >&2
 fi
 
-exec node "${SERVER_DIR}/index.js"
+# Forward optional server arguments so host-specific manifests can select a
+# narrow profile. Existing Claude launches pass no extra arguments and retain
+# the default `full` surface byte-for-byte.
+exec node "${SERVER_DIR}/index.js" "$@"

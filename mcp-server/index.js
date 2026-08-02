@@ -91985,7 +91985,7 @@ function registerPrompts(server2, summaryOf) {
 }
 
 // packages/mcp-server/dist/tool-profiles.js
-var PROFILES = ["full", "agent"];
+var PROFILES = ["full", "agent", "verifier"];
 var PROFILE_FLAG = "--profile";
 var PROFILE_ENV_VAR = "PRD_GEN_PROFILE";
 var INTERNAL_TOOL_NAMES = [
@@ -91996,16 +91996,23 @@ var INTERNAL_TOOL_NAMES = [
   "get_strategy_effectiveness"
 ];
 var INTERNAL_SET = new Set(INTERNAL_TOOL_NAMES);
+var VERIFIER_TOOL_NAMES = [
+  "validate_prd_section",
+  "validate_prd_document"
+];
+var VERIFIER_SET = new Set(VERIFIER_TOOL_NAMES);
 function isAllowed(profile, toolName) {
   if (profile === "full")
     return true;
-  return !INTERNAL_SET.has(toolName);
+  if (profile === "agent")
+    return !INTERNAL_SET.has(toolName);
+  return VERIFIER_SET.has(toolName);
 }
 function parseProfile(value) {
   if (PROFILES.includes(value)) {
     return value;
   }
-  throw new Error(`invalid profile '${value}': expected 'full' or 'agent'`);
+  throw new Error(`invalid profile '${value}': expected ${PROFILES.join(", ")}`);
 }
 function resolveProfile(argv, env) {
   const flagValue = flagValueOf(argv);
@@ -92023,7 +92030,7 @@ function flagValueOf(argv) {
     if (arg2 === PROFILE_FLAG) {
       const next = argv[i2 + 1];
       if (next === void 0) {
-        throw new Error(`${PROFILE_FLAG} requires a value: 'full' or 'agent'`);
+        throw new Error(`${PROFILE_FLAG} requires a value: ${PROFILES.join(", ")}`);
       }
       found = next;
       i2++;
@@ -92035,8 +92042,13 @@ function flagValueOf(argv) {
 }
 var FULL_INSTRUCTIONS = "prd-gen \u2014 staged PRD generation + verification MCP ('full' profile: every tool; the default). The tools are a pipeline and the order is the product; calling them out of order does not error, it leaves the pipeline in a wrong state. Generation loop: coordinate_context_budget \u2192 start_pipeline \u2192 get_pipeline_state \u2192 submit_action_result (repeat until done). Verification: plan_document_verification / plan_section_verification \u2192 submit_action_result \u2192 conclude_verification. Deterministic checks: validate_prd_section, validate_prd_document, map_failure_to_retrieval. Internal diagnostics (get_config, read_skill_config, check_health, get_quality_history, get_strategy_effectiveness) are also exposed here. The run_prd_pipeline and verify_prd_document prompts (prompts/list) publish the ordering as protocol. Restart with --profile agent for the agent-facing subset only.";
 var AGENT_INSTRUCTIONS = "prd-gen \u2014 staged PRD generation + verification MCP ('agent' profile: the agent-facing generation/verification surface). The tools are a pipeline and the order is the product; calling them out of order leaves the pipeline in a wrong state, not an error. Generation loop: coordinate_context_budget \u2192 start_pipeline \u2192 get_pipeline_state \u2192 submit_action_result (repeat until done). Verification: plan_document_verification / plan_section_verification \u2192 submit_action_result \u2192 conclude_verification, with validate_prd_section / validate_prd_document and map_failure_to_retrieval for deterministic checks. The internal diagnostics/telemetry tools are hidden AND rejected on call in this profile; restart with --profile full to expose them. The run_prd_pipeline and verify_prd_document prompts guide the flow.";
+var VERIFIER_INSTRUCTIONS = "prd-gen \u2014 deterministic PRD structure verifier ('verifier' profile). Only validate_prd_section and validate_prd_document are exposed. These tools run Hard Output Rules and cross-section consistency checks without LLM calls. A passing report establishes structural conformance to those rules; it does not establish factual accuracy, implementation feasibility, or semantic correctness. Restart with --profile full for the complete pipeline or --profile agent for its agent-facing subset.";
 function instructions(profile) {
-  return profile === "agent" ? AGENT_INSTRUCTIONS : FULL_INSTRUCTIONS;
+  if (profile === "agent")
+    return AGENT_INSTRUCTIONS;
+  if (profile === "verifier")
+    return VERIFIER_INSTRUCTIONS;
+  return FULL_INSTRUCTIONS;
 }
 
 // packages/mcp-server/dist/server-version.js

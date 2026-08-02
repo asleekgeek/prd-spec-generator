@@ -163,6 +163,9 @@ jobs:
         # offline (the no-credentials path returns "skipped").
         run: pnpm run test:external-judge
 
+      - name: Test portable Codex and Gemini packaging
+        run: pnpm run test:portable
+
       - name: Documented claims match the suite
         # The advertised test count is quoted in eight user-facing places. The
         # gate that checks it ran at release time only, so main could carry a

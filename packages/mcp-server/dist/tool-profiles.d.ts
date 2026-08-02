@@ -8,10 +8,12 @@
  * `full` surface (non-goal: removing tools — everything stays reachable under
  * `full`).
  *
- * Two profiles:
+ * Three profiles:
  *   - `full`  — every registered tool. **The default.**
  *   - `agent` — the agent-facing set: every tool except the internal
  *     diagnostics/telemetry tools listed in {@link INTERNAL_TOOL_NAMES}.
+ *   - `verifier` — the two deterministic PRD validators only. This narrow,
+ *     host-neutral surface is used by the Codex and Gemini distributions.
  *
  * Default = `full` (documented divergence). Issue #28 criterion 3 asks the
  * default to be the agent-facing set. This wave keeps `full` the default
@@ -24,7 +26,7 @@
  * Selection precedence: `--profile` CLI flag > `PRD_GEN_PROFILE` env var >
  * `full` (matches the `PRD_GEN_*` env convention, e.g. `PRD_GEN_SKILL_CONFIG`).
  */
-export declare const PROFILES: readonly ["full", "agent"];
+export declare const PROFILES: readonly ["full", "agent", "verifier"];
 export type ToolProfile = (typeof PROFILES)[number];
 export declare const PROFILE_FLAG = "--profile";
 export declare const PROFILE_ENV_VAR = "PRD_GEN_PROFILE";
@@ -36,10 +38,12 @@ export declare const PROFILE_ENV_VAR = "PRD_GEN_PROFILE";
  * its name here, nothing else.
  */
 export declare const INTERNAL_TOOL_NAMES: readonly ["get_config", "read_skill_config", "check_health", "get_quality_history", "get_strategy_effectiveness"];
+/** Deterministic, read-only tools exposed by the portable verifier profile. */
+export declare const VERIFIER_TOOL_NAMES: readonly ["validate_prd_section", "validate_prd_document"];
 /** Whether `toolName` is advertised under `profile`. */
 export declare function isAllowed(profile: ToolProfile, toolName: string): boolean;
 /**
- * Parse a profile name. Accepts exactly `full` and `agent`.
+ * Parse a profile name. Accepts exactly the names in {@link PROFILES}.
  * @throws Error naming the accepted values for any other input.
  */
 export declare function parseProfile(value: string): ToolProfile;

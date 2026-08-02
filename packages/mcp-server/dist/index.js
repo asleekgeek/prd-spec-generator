@@ -54,9 +54,10 @@ function loadSkillMd() {
 }
 // ─── Server Setup ────────────────────────────────────────────────────────────
 // Active tool profile (issue #28). Resolved once at startup from --profile /
-// PRD_GEN_PROFILE, defaulting to `full`. Default stays `full` (documented
-// divergence from #28 criterion 3) because shrinking the default advertised
-// surface is breaking — see tool-profiles.ts + CHANGELOG.md.
+// PRD_GEN_PROFILE, defaulting to `full`. The portable host manifests select the
+// narrow `verifier` profile explicitly; Claude passes no profile and therefore
+// retains the default. Shrinking that default would be a breaking change — see
+// tool-profiles.ts + CHANGELOG.md.
 const ACTIVE_PROFILE = resolveProfile(process.argv.slice(2), process.env);
 const server = new McpServer({
     name: "prd-gen",
