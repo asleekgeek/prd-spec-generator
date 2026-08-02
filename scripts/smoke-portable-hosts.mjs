@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -45,8 +45,16 @@ for (const host of HOSTS) {
 
   // This is the command the host consumes. Neither the launcher nor its
   // profile arguments are restated in this smoke test.
-  const command = server.command.replaceAll(host.placeholder, ROOT);
-  const args = server.args.map((arg) => arg.replaceAll(host.placeholder, ROOT));
+  const portableRoot = mkdtempSync(join(tmpdir(), `prd-verifier-install-${host.name}-`));
+  mkdirSync(join(portableRoot, "bin"));
+  mkdirSync(join(portableRoot, "mcp-server"));
+  cpSync(join(ROOT, "bin", "ensure-deps.sh"), join(portableRoot, "bin", "ensure-deps.sh"));
+  for (const file of ["index.js", "package.json", "package-lock.json"]) {
+    cpSync(join(ROOT, "mcp-server", file), join(portableRoot, "mcp-server", file));
+  }
+
+  const command = server.command.replaceAll(host.placeholder, portableRoot);
+  const args = server.args.map((arg) => arg.replaceAll(host.placeholder, portableRoot));
   const isolatedHome = mkdtempSync(join(tmpdir(), `prd-verifier-${host.name}-`));
   const requests = [
     {
@@ -77,7 +85,7 @@ for (const host of HOSTS) {
 
   try {
     const run = spawnSync(command, args, {
-      cwd: ROOT,
+      cwd: portableRoot,
       env: {
         ...process.env,
         HOME: isolatedHome,
@@ -85,7 +93,6 @@ for (const host of HOSTS) {
       },
       input: `${requests.map((request) => JSON.stringify(request)).join("\n")}\n`,
       encoding: "utf8",
-      timeout: 30_000,
       maxBuffer: 10 * 1024 * 1024,
     });
 
@@ -113,6 +120,16 @@ for (const host of HOSTS) {
     assert.equal(call?.result?.isError, undefined, `${host.name}: tool returned isError`);
     const report = JSON.parse(call.result.content[0].text);
     assert.equal(typeof report, "object", `${host.name}: verifier returned no report`);
+    assert.equal(
+      existsSync(join(portableRoot, "mcp-server", "node_modules", "ajv")),
+      true,
+      `${host.name}: launcher did not provision the required runtime dependencies`,
+    );
+    assert.equal(
+      existsSync(join(portableRoot, "mcp-server", "node_modules", "better-sqlite3")),
+      false,
+      `${host.name}: verifier launcher provisioned its unreachable optional database`,
+    );
 
     console.log(
       `PORTABLE HOST SMOKE OK: ${host.name}, ${initialize.result.serverInfo.version}, ` +
@@ -120,5 +137,6 @@ for (const host of HOSTS) {
     );
   } finally {
     rmSync(isolatedHome, { recursive: true, force: true });
+    rmSync(portableRoot, { recursive: true, force: true });
   }
 }
