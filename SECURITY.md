@@ -2,7 +2,7 @@
 
 ## What the server accesses
 
-prd-spec-generator is an MCP server that turns a feature description into a
+AI Architect MCP Spec is an MCP server that turns a feature description into a
 9-file PRD. Its exposure, stated plainly:
 
 - **It runs as an MCP server in your session**, with the permissions your MCP
@@ -28,18 +28,18 @@ As of issue #29, every release (`.github/workflows/release.yml`) ships:
   this repository and workflow:
 
   ```bash
-  gh attestation verify prd-spec-generator.mcpb --repo cdeust/prd-spec-generator
+  gh attestation verify ai-architect-mcp-spec.mcpb --repo cdeust/ai-architect-mcp-spec
   ```
 
 - **Checksum integrity, verified in the pipeline** — the `.mcpb` SHA-256 is
   published as a `.sha256` companion **and** written into `server.json`
-  (`packages[0].file_sha256`, the value the MCP registry hands consumers). The
+  (`packages[0].fileSha256`, the value the MCP registry hands consumers). The
   release job runs `scripts/release/verify-mcpb-checksum.mjs` and **fails the
   release if server.json's checksum does not equal the built artifact** —
   closing the #23 defect class (a published integrity value that did not match
   the artifact), not just its instance. The assertion is unit-tested.
 
-- **SBOM** — `prd-spec-generator.cdx.json` (CycloneDX, generated from
+- **SBOM** — `ai-architect-mcp-spec.cdx.json` (CycloneDX, generated from
   `pnpm-lock.yaml`) enumerates the workspace dependency graph and accompanies
   every release.
 
@@ -126,7 +126,7 @@ a reader can verify from this repository rather than from a shield.
 If you discover a security issue in this project, **do not** open a public
 issue. Instead, send a private report to the maintainer.
 
-**Disclosure channel:** open a [private security advisory on GitHub](https://github.com/cdeust/prd-spec-generator/security/advisories/new).
+**Disclosure channel:** open a [private security advisory on GitHub](https://github.com/cdeust/ai-architect-mcp-spec/security/advisories/new).
 
 Include:
 

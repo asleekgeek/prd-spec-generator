@@ -322,8 +322,8 @@ This call is **read-only**. It does not advance the pipeline.
 ## Run the smoke harness yourself
 
 ```bash
-git clone https://github.com/cdeust/prd-spec-generator.git
-cd prd-spec-generator
+git clone https://github.com/cdeust/ai-architect-mcp-spec.git
+cd ai-architect-mcp-spec
 pnpm install --frozen-lockfile
 pnpm build
 pnpm test --filter @prd-gen/orchestration smoke

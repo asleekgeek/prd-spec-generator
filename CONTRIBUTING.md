@@ -1,4 +1,4 @@
-# Contributing to prd-spec-generator
+# Contributing to AI Architect MCP Spec
 
 Thanks for considering a contribution. This project's quality bar comes from
 [`rules/coding-standards.md`](https://github.com/cdeust/zetetic-team-subagents/blob/main/rules/coding-standards.md)
@@ -22,8 +22,8 @@ the architecture diagram.
 **Prerequisites:** Node.js 20.x or 22.x, pnpm v10+ (`corepack enable && corepack prepare pnpm@10`).
 
 ```bash
-git clone https://github.com/cdeust/prd-spec-generator.git
-cd prd-spec-generator
+git clone https://github.com/cdeust/ai-architect-mcp-spec.git
+cd ai-architect-mcp-spec
 pnpm install --frozen-lockfile
 pnpm build              # builds all 9 buildable packages
 pnpm test               # runs the full test suite (currently 258 tests + 2 integration skipped)

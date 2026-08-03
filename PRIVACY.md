@@ -1,10 +1,10 @@
-# Privacy Policy — prd-spec-generator
+# Privacy Policy — AI Architect MCP Spec
 
 **Effective date:** 2026-06-19
 
 ## What this server does
 
-`prd-spec-generator` is a local MCP server that turns a feature description into a
+AI Architect MCP Spec is a local MCP server that turns a feature description into a
 verified PRD (Product Requirements Document). It runs as a Node.js process on your
 machine and communicates exclusively over stdio — it does not open any network port
 and does not phone home.
@@ -46,4 +46,4 @@ consequence other than losing historical calibration data.
 ## Contact
 
 Questions or concerns: open an issue at
-<https://github.com/cdeust/prd-spec-generator/issues>.
+<https://github.com/cdeust/ai-architect-mcp-spec/issues>.

@@ -5,7 +5,7 @@
     "email": "admin@ai-architect.tools"
   },
   "metadata": {
-    "description": "prd-spec-generator — turn a feature description into a 9-file PRD via a stateless reducer with multi-judge verification calibrated against externally-grounded oracles, deterministic validation, mechanically-sealed falsifier protocols, and a closed-loop reliability + retry-budget + KPI-gate calibration stack",
+    "description": "AI Architect MCP Spec — turn a feature description into a 9-file PRD via a stateless reducer with multi-judge verification calibrated against externally-grounded oracles, deterministic validation, mechanically-sealed falsifier protocols, and a closed-loop reliability + retry-budget + KPI-gate calibration stack",
     "version": "0.7.0"
   },
   "plugins": [
@@ -18,8 +18,8 @@
         "name": "Clement Deust",
         "email": "admin@ai-architect.tools"
       },
-      "homepage": "https://github.com/cdeust/prd-spec-generator",
-      "repository": "https://github.com/cdeust/prd-spec-generator",
+      "homepage": "https://github.com/cdeust/ai-architect-mcp-spec",
+      "repository": "https://github.com/cdeust/ai-architect-mcp-spec",
       "license": "MIT",
       "keywords": [
         "prd",

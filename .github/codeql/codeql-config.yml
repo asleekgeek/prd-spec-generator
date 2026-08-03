@@ -1,4 +1,4 @@
-name: "prd-spec-generator CodeQL config"
+name: "AI Architect MCP Spec CodeQL config"
 
 # Scope the analysis to SOURCE. This is not a suppression of findings — it is
 # pointing the analyser at code a human writes.

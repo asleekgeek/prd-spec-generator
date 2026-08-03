@@ -9,11 +9,12 @@ const text = (path) => readFileSync(join(root, path), "utf8");
 
 const product = "prd-spec-generator";
 const distribution = "ai-architect-mcp-spec";
+const repository = distribution;
 const registryId = `io.github.cdeust/${distribution}`;
 const pkg = json("package.json");
 const version = pkg.version;
 
-assert.equal(pkg.name, product);
+assert.equal(pkg.name, distribution);
 for (const path of [
   "manifest.json",
   ".claude-plugin/plugin.json",
@@ -30,11 +31,12 @@ assert.equal(marketplace.plugins.find(({ name }) => name === product)?.version, 
 
 const server = json("server.json");
 assert.equal(server.name, registryId);
+assert.equal(server.repository.url, `https://github.com/cdeust/${repository}`);
 assert.equal(server.version, version);
 assert.equal(server.packages[0].version, version);
 assert.equal(
   server.packages[0].identifier,
-  `https://github.com/cdeust/${product}/releases/download/v${version}/${distribution}.mcpb`,
+  `https://github.com/cdeust/${repository}/releases/download/v${version}/${distribution}.mcpb`,
 );
 if (server.packages[0].fileSha256 !== undefined) {
   assert.match(server.packages[0].fileSha256, /^[a-f0-9]{64}$/);
@@ -50,5 +52,6 @@ assert.match(text("CHANGELOG.md"), new RegExp(`^## \\[${version.replaceAll(".", 
 const release = text(".github/workflows/release.yml");
 assert.match(release, new RegExp(`${distribution}\\.mcpb`));
 assert.match(release, new RegExp(`${product}\\.mcpb`));
+assert.match(release, new RegExp(`${distribution}\\.cdx\\.json`));
 
 console.log(`Distribution identity is consistent at ${distribution} v${version}.`);
