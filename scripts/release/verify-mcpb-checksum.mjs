@@ -3,7 +3,7 @@
  *
  * Issue #29, criterion 4 — the proper close of #23. #23 was a *published
  * integrity value that did not match the artifact*: release.yml recorded a
- * placeholder `file_sha256` in server.json and, for a while, nothing wrote the
+ * placeholder `fileSha256` in server.json and, for a while, nothing wrote the
  * real one back. The instance was fixed (the release job now patches it); this
  * module closes the CLASS by making the match CHECKABLE — in the release
  * pipeline (a step runs this and fails the release on mismatch) and in tests
@@ -19,7 +19,7 @@ import { readFile } from "node:fs/promises";
 /** Thrown when the artifact's digest does not equal server.json's record. */
 export class ChecksumMismatchError extends Error {
   /**
-   * @param {string} expected server.json packages[0].file_sha256 (what a
+   * @param {string} expected server.json packages[0].fileSha256 (what a
    *   consumer trusts and downloads against)
    * @param {string} actual digest computed from the built .mcpb bytes
    */
@@ -52,14 +52,20 @@ export function sha256Hex(bytes) {
  */
 export function extractRecordedChecksum(serverJson) {
   const pkg = serverJson?.packages?.[0];
-  const sha = pkg?.file_sha256;
+  const sha = pkg?.fileSha256;
   if (typeof sha !== "string") {
-    throw new Error("server.json packages[0].file_sha256 is missing or not a string");
+    throw new Error("server.json packages[0].fileSha256 is missing or not a string");
   }
   const normalized = sha.trim().toLowerCase();
+  if (normalized === "0".repeat(64)) {
+    throw new Error(
+      "server.json packages[0].fileSha256 is the all-zero pre-release placeholder; " +
+        "a placeholder must never be published",
+    );
+  }
   if (!/^[0-9a-f]{64}$/.test(normalized)) {
     throw new Error(
-      `server.json packages[0].file_sha256 is not a SHA-256 digest ` +
+      `server.json packages[0].fileSha256 is not a SHA-256 digest ` +
         `(got ${JSON.stringify(sha)}); a placeholder must never be published`,
     );
   }

@@ -11,6 +11,12 @@ const text = (path) => readFileSync(join(ROOT, path), "utf8");
 const EXPECTED_ARGS = ["--profile", "verifier"];
 const SKILLS = ["audit-prd", "validate-spec"];
 
+const assertOptionalReleasedChecksum = (checksum) => {
+  if (checksum === undefined) return;
+  assert.match(checksum, /^[a-f0-9]{64}$/);
+  assert.notEqual(checksum, "0".repeat(64));
+};
+
 test("Codex and Gemini launch the same verifier profile", () => {
   const pkg = json("package.json");
   const codex = json(".codex-plugin/plugin.json");
@@ -51,11 +57,34 @@ test("portable skill manifests contain only supported frontmatter", () => {
 });
 
 test("Claude remains on its existing full-profile launch path", () => {
+  const pkg = json("package.json");
   const claude = json(".mcp.json");
+  const claudePlugin = json(".claude-plugin/plugin.json");
+  const manifest = json("manifest.json");
   const server = claude.mcpServers["prd-gen"];
   const launcher = text("bin/ensure-deps.sh");
+  assert.equal(claudePlugin.name, "prd-spec-generator");
+  assert.equal(claudePlugin.version, pkg.version);
+  assert.equal(manifest.name, "prd-spec-generator");
+  assert.equal(manifest.version, pkg.version);
   assert.equal(server.args.includes("--profile"), false);
   assert.match(server.args[0], /\$\{CLAUDE_PLUGIN_ROOT\}/);
   assert.match(launcher, /exec node .*"\$@"/);
   assert.doesNotMatch(launcher, /PROFILE|--profile|omit=optional/);
+});
+
+test("canonical distribution identity is separate from host plugin identity", () => {
+  const pkg = json("package.json");
+  const server = json("server.json");
+  assert.equal(server.name, "io.github.cdeust/ai-architect-mcp-spec");
+  assert.equal(server.version, pkg.version);
+  assert.equal(server.packages[0].version, pkg.version);
+  assert.match(server.packages[0].identifier, /\/ai-architect-mcp-spec\.mcpb$/);
+  assertOptionalReleasedChecksum(server.packages[0].fileSha256);
+});
+
+test("portable identity accepts pre-release and real post-release checksums", () => {
+  assert.doesNotThrow(() => assertOptionalReleasedChecksum(undefined));
+  assert.doesNotThrow(() => assertOptionalReleasedChecksum("a".repeat(64)));
+  assert.throws(() => assertOptionalReleasedChecksum("0".repeat(64)));
 });

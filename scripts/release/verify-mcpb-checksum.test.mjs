@@ -1,7 +1,7 @@
 /**
  * Regression tests for the #23 defect class (issue #29 criterion 4).
  *
- * #23 shipped a server.json whose file_sha256 did not match the released
+ * #23 shipped a server.json whose fileSha256 did not match the released
  * .mcpb, and nothing checked. The load-bearing cases here are therefore the
  * REJECTIONS: a mismatched hash, and a placeholder that was never patched,
  * must both fail (§13 A3, G4). Asserting only that a correct hash passes would
@@ -18,7 +18,7 @@ import {
 
 const REAL = "d6f0ce83456f65ffd7663966362612fa2224c7670dbc419d72db7cfccfc10815";
 const serverJson = (sha) => ({
-  packages: [{ registryType: "mcpb", identifier: "…/x.mcpb", file_sha256: sha }],
+  packages: [{ registryType: "mcpb", identifier: "…/x.mcpb", fileSha256: sha }],
 });
 
 describe("mcpb checksum verification (#23 class)", () => {
@@ -57,9 +57,12 @@ describe("mcpb checksum verification (#23 class)", () => {
   it("REJECTS an unpatched placeholder (never a published placeholder)", () => {
     expect(() => extractRecordedChecksum(serverJson("PLACEHOLDER"))).toThrow();
     expect(() => extractRecordedChecksum(serverJson(""))).toThrow();
+    expect(() => extractRecordedChecksum(serverJson("0".repeat(64)))).toThrow(
+      /all-zero pre-release placeholder/,
+    );
   });
 
-  it("REJECTS a missing file_sha256 field", () => {
+  it("REJECTS a missing fileSha256 field", () => {
     expect(() => extractRecordedChecksum({ packages: [{}] })).toThrow();
     expect(() => extractRecordedChecksum({})).toThrow();
   });
