@@ -46559,10 +46559,8 @@ var EventRateK50Schema = external_exports.object({
 });
 
 // packages/benchmark/dist/calibration/schema-oracle.js
-import { createRequire } from "module";
-var _require = createRequire(import.meta.url);
-var AjvConstructor = _require("ajv");
-var ajv = new AjvConstructor({ allErrors: true });
+var import_ajv2 = __toESM(require_ajv(), 1);
+var ajv = new import_ajv2.Ajv({ allErrors: true });
 async function schemaOracle(payload) {
   const { schema, instance, expected_valid } = payload;
   const schemaTitle = typeof schema === "object" && schema !== null && "title" in schema && typeof schema.title === "string" ? schema.title : "(untitled)";

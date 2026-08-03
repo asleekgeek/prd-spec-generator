@@ -20,10 +20,9 @@
   "skills": "./skills/",
   "mcpServers": {
     "prd-spec-verifier": {
-      "command": "bash",
+      "command": "node",
       "args": [
-        "${PLUGIN_ROOT}/bin/ensure-deps.sh",
-        "${PLUGIN_ROOT}",
+        "${PLUGIN_ROOT}/mcp-server/index.js",
         "--profile",
         "verifier"
       ]

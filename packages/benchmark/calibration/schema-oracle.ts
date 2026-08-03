@@ -13,14 +13,11 @@
  *   computeReliabilityComparison in Wave-D held-out subset path).
  */
 
-// Ajv v8 ships as CommonJS with a named default export. With Node16 module
-// resolution and esModuleInterop=true, the CJS default is accessible via
-// the namespace import. Using createRequire ensures we get the constructor.
-// source: Ajv v8 docs §"Usage with TypeScript" and ts-node/esm interop notes.
-import { createRequire } from "module";
-const _require = createRequire(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-const AjvConstructor = _require("ajv") as typeof import("ajv").default;
+// Keep this as a static import so the portable MCP bundle includes Ajv. A
+// createRequire("ajv") call survives esbuild as a runtime package lookup,
+// which makes a plugin cloned into Codex's read-only cache depend on a
+// first-launch `npm ci` that the host cannot perform.
+import { Ajv as AjvConstructor } from "ajv";
 
 import type { SchemaPayload, OracleResult } from "./oracle-types.js";
 
@@ -29,9 +26,6 @@ import type { SchemaPayload, OracleResult } from "./oracle-types.js";
 // source: Ajv docs §"Caching"; compile() caches compiled schemas; here we use
 // validate() which compiles + validates in one step, acceptable at low call
 // frequency (calibration path, not hot path).
-// justification: Ajv constructor called via createRequire (see above).
-// Reflection-for-control-flow §7.2 exemption: this is the standard
-// CJS-ESM interop pattern; the call is isolated to this module boundary.
 const ajv = new AjvConstructor({ allErrors: true });
 
 /**

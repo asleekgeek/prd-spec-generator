@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -46,12 +46,14 @@ for (const host of HOSTS) {
   // This is the command the host consumes. Neither the launcher nor its
   // profile arguments are restated in this smoke test.
   const portableRoot = mkdtempSync(join(tmpdir(), `prd-verifier-install-${host.name}-`));
-  mkdirSync(join(portableRoot, "bin"));
   mkdirSync(join(portableRoot, "mcp-server"));
-  cpSync(join(ROOT, "bin", "ensure-deps.sh"), join(portableRoot, "bin", "ensure-deps.sh"));
-  for (const file of ["index.js", "package.json", "package-lock.json"]) {
+  for (const file of ["index.js", "package.json"]) {
     cpSync(join(ROOT, "mcp-server", file), join(portableRoot, "mcp-server", file));
   }
+  // Reproduce Codex's immutable installed-plugin cache. The verifier must
+  // initialize without creating node_modules or writing anywhere below root.
+  chmodSync(join(portableRoot, "mcp-server"), 0o555);
+  chmodSync(portableRoot, 0o555);
 
   const command = server.command.replaceAll(host.placeholder, portableRoot);
   const args = server.args.map((arg) => arg.replaceAll(host.placeholder, portableRoot));
@@ -120,22 +122,13 @@ for (const host of HOSTS) {
     assert.equal(call?.result?.isError, undefined, `${host.name}: tool returned isError`);
     const report = JSON.parse(call.result.content[0].text);
     assert.equal(typeof report, "object", `${host.name}: verifier returned no report`);
-    assert.equal(
-      existsSync(join(portableRoot, "mcp-server", "node_modules", "ajv")),
-      true,
-      `${host.name}: launcher did not provision the required runtime dependencies`,
-    );
-    assert.equal(
-      existsSync(join(portableRoot, "mcp-server", "node_modules", "better-sqlite3")),
-      false,
-      `${host.name}: verifier launcher provisioned its unreachable optional database`,
-    );
-
     console.log(
       `PORTABLE HOST SMOKE OK: ${host.name}, ${initialize.result.serverInfo.version}, ` +
         `${list.result.tools.length} tools, validate_prd_section completed`,
     );
   } finally {
+    chmodSync(join(portableRoot, "mcp-server"), 0o755);
+    chmodSync(portableRoot, 0o755);
     rmSync(isolatedHome, { recursive: true, force: true });
     rmSync(portableRoot, { recursive: true, force: true });
   }

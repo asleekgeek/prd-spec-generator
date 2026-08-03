@@ -27,12 +27,12 @@ test("Codex and Gemini launch the same verifier profile", () => {
   assert.equal(codex.skills, "./skills/");
   assert.equal(marketplace.name, "prd-spec-generator-marketplace");
   assert.deepEqual(marketplaceEntry.source, { source: "local", path: "./" });
-  assert.equal(codexServer.command, "bash");
-  assert.equal(geminiServer.command, "bash");
+  assert.equal(codexServer.command, "node");
+  assert.equal(geminiServer.command, "node");
   assert.deepEqual(codexServer.args.slice(-2), EXPECTED_ARGS);
   assert.deepEqual(geminiServer.args.slice(-2), EXPECTED_ARGS);
-  assert.match(codexServer.args[0], /\$\{PLUGIN_ROOT\}\/bin\/ensure-deps\.sh$/);
-  assert.match(geminiServer.args[0], /\$\{extensionPath\}\/bin\/ensure-deps\.sh$/);
+  assert.equal(codexServer.args[0], "${PLUGIN_ROOT}/mcp-server/index.js");
+  assert.equal(geminiServer.args[0], "${extensionPath}/mcp-server/index.js");
 });
 
 test("portable skill manifests contain only supported frontmatter", () => {

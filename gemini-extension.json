@@ -4,10 +4,9 @@
   "description": "Deterministic PRD structure verification with two MCP tools and shared audit skills.",
   "mcpServers": {
     "prd-spec-verifier": {
-      "command": "bash",
+      "command": "node",
       "args": [
-        "${extensionPath}/bin/ensure-deps.sh",
-        "${extensionPath}",
+        "${extensionPath}/mcp-server/index.js",
         "--profile",
         "verifier"
       ]

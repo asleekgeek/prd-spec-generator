@@ -20,6 +20,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Codex and Gemini verifier startup from immutable plugin installs.** Their
+  host manifests now execute the bundled server directly instead of running a
+  first-launch `npm ci` inside the installed plugin directory, which Codex
+  mounts read-only. Ajv is statically imported so esbuild carries it in the
+  bundle, and the portable-host smoke test makes the staged plugin root
+  read-only before exercising MCP initialize, tool discovery, and validation.
+  Claude Code remains the primary full-profile interface: its `.mcp.json`
+  launch path and 17-tool surface are unchanged and covered by regression
+  tests.
+
 - **The server advertised the wrong version to every host that connected.**
   `serverInfo.version` was the literal `0.4.0` in `packages/mcp-server/src/index.ts`
   while package.json, `.claude-plugin/plugin.json`, manifest.json and server.json
