@@ -3,7 +3,7 @@
   "name": "io.github.cdeust/ai-architect-mcp-spec",
   "description": "PRD verification and host-driven generation with multi-judge consensus across 17 MCP tools.",
   "repository": {
-    "url": "https://github.com/cdeust/prd-spec-generator",
+    "url": "https://github.com/cdeust/ai-architect-mcp-spec",
     "source": "github"
   },
   "version": "0.7.0",
@@ -11,7 +11,7 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/cdeust/prd-spec-generator/releases/download/v0.7.0/ai-architect-mcp-spec.mcpb",
+      "identifier": "https://github.com/cdeust/ai-architect-mcp-spec/releases/download/v0.7.0/ai-architect-mcp-spec.mcpb",
       "version": "0.7.0",
       "transport": {
         "type": "stdio"

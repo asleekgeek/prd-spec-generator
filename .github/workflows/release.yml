@@ -7,7 +7,7 @@ name: Release
 # provenance (issue #29 criterion 2) has no artifact to attest — see the
 # per-job notes. What this workflow now does:
 #   * attests build provenance for the .mcpb and the SBOM (Sigstore; verify
-#     with `gh attestation verify <file> --repo cdeust/prd-spec-generator`);
+#     with `gh attestation verify <file> --repo cdeust/ai-architect-mcp-spec`);
 #   * generates a CycloneDX SBOM from pnpm-lock.yaml covering the workspace;
 #   * VERIFIES server.json's fileSha256 equals the built .mcpb before it is
 #     committed/published — closing the #23 defect class in the pipeline, not
@@ -133,10 +133,10 @@ jobs:
           # (criterion 8) does not apply, but the version is fixed so the run is
           # reproducible. FETCH_LICENSE stays off to keep the job network-light.
           npx -y @cyclonedx/cdxgen@12.8.2 -t pnpm --spec-version 1.5 \
-            -o prd-spec-generator.cdx.json
-          node -e "JSON.parse(require('fs').readFileSync('prd-spec-generator.cdx.json','utf8'))"
-          echo "SBOM components: $(node -e "console.log((JSON.parse(require('fs').readFileSync('prd-spec-generator.cdx.json','utf8')).components||[]).length)")"
-          shasum -a 256 prd-spec-generator.cdx.json | awk '{print $1}' > prd-spec-generator.cdx.json.sha256
+            -o ai-architect-mcp-spec.cdx.json
+          node -e "JSON.parse(require('fs').readFileSync('ai-architect-mcp-spec.cdx.json','utf8'))"
+          echo "SBOM components: $(node -e "console.log((JSON.parse(require('fs').readFileSync('ai-architect-mcp-spec.cdx.json','utf8')).components||[]).length)")"
+          shasum -a 256 ai-architect-mcp-spec.cdx.json | awk '{print $1}' > ai-architect-mcp-spec.cdx.json.sha256
 
       - name: Attest build provenance (.mcpb + SBOM)
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
@@ -144,7 +144,7 @@ jobs:
           subject-path: |
             ai-architect-mcp-spec.mcpb
             prd-spec-generator.mcpb
-            prd-spec-generator.cdx.json
+            ai-architect-mcp-spec.cdx.json
 
       - name: Patch server.json with the real .mcpb checksum
         run: |
@@ -221,7 +221,7 @@ jobs:
             ai-architect-mcp-spec.mcpb.sha256
             prd-spec-generator.mcpb
             prd-spec-generator.mcpb.sha256
-            prd-spec-generator.cdx.json
-            prd-spec-generator.cdx.json.sha256
+            ai-architect-mcp-spec.cdx.json
+            ai-architect-mcp-spec.cdx.json.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

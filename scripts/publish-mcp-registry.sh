@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# publish-mcp-registry.sh — Publish runbook for prd-spec-generator to the MCP ecosystem.
+# publish-mcp-registry.sh — Publish runbook for AI Architect MCP Spec.
 #
 # NOTE (#23, since release.yml's "Commit and push patched server.json to
 # main" step): the release workflow now patches server.json's
@@ -80,7 +80,7 @@ if [ -z "${TAG}" ]; then
   exit 1
 fi
 
-REPO="cdeust/prd-spec-generator"
+REPO="cdeust/ai-architect-mcp-spec"
 BUNDLE_NAME="ai-architect-mcp-spec.mcpb"
 RELEASE_URL="https://github.com/${REPO}/releases/download/${TAG}/${BUNDLE_NAME}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,12 +1,12 @@
 <!-- mcp-name: io.github.cdeust/ai-architect-mcp-spec -->
 
 <p align="center">
-  <img src="assets/banner.svg" alt="prd-spec-generator — a stateless reducer that turns a feature description into a PRD the rest of your pipeline can act on" width="100%"/>
+  <img src="assets/banner.svg" alt="AI Architect MCP Spec — verified PRDs for agentic delivery pipelines" width="100%"/>
 </p>
 
-The product and host plugins remain **prd-spec-generator**. Its canonical MCP
-Registry and portable bundle identity is **ai-architect-mcp-spec**; the legacy
-`prd-spec-generator.mcpb` release asset remains available for compatibility.
+**AI Architect MCP Spec** is distributed as `ai-architect-mcp-spec`. The
+Claude Code plugin remains `prd-spec-generator` for compatibility, as does the
+legacy `prd-spec-generator.mcpb` release asset.
 After 0.7.0 is published under the new identity, the former
 `io.github.cdeust/prd-spec-generator` Registry versions are deprecated with a
 pointer to the canonical entry rather than left active and frozen.
@@ -43,7 +43,7 @@ pointer to the canonical entry rather than left active and frozen.
 
 Every AI agent that drafts a PRD eventually invents a function that doesn't exist, claims latency it can't measure, or writes acceptance criteria that don't tie back to the requirements they're supposed to test. The output sounds confident. It is not actionable. The next stage in the pipeline — code generation, ticket import, sprint planning — silently inherits the hallucination, ships it, and pays for it later.
 
-**prd-spec-generator** is a TypeScript MCP server that fixes this at the structural level. Its portable verifier gives Codex, Gemini CLI, Claude Code, CI, and other stdio MCP hosts the same deterministic Hard Output Rules and cross-section traceability checks. The full pipeline is a stateless reducer (`step(state, result?) → next_state, action`) driven by a host that can execute its orchestration actions; Claude Code is the only packaged full-pipeline host today. Sections are produced one at a time, validated before the host ever sees them, and every load-bearing claim is judged by a panel of genius reasoning agents drawn from `zetetic-team-subagents` against the codebase graph from `automatised-pipeline`. The loop is closed: per-judge reliability is calibrated from history, retry budgets are derived from survival statistics, KPI gates are tuned against frozen baselines, and held-out partitions are mechanically sealed so no calibration result can be peeked at before evaluation.
+**AI Architect MCP Spec** is a TypeScript MCP server that fixes this at the structural level. Its portable verifier gives Codex, Gemini CLI, Claude Code, CI, and other stdio MCP hosts the same deterministic Hard Output Rules and cross-section traceability checks. The full pipeline is a stateless reducer (`step(state, result?) → next_state, action`) driven by a host that can execute its orchestration actions; Claude Code is the only packaged full-pipeline host today. Sections are produced one at a time, validated before the host ever sees them, and every load-bearing claim is judged by a panel of genius reasoning agents drawn from `zetetic-team-subagents` against the codebase graph from `automatised-pipeline`. The loop is closed: per-judge reliability is calibrated from history, retry budgets are derived from survival statistics, KPI gates are tuned against frozen baselines, and held-out partitions are mechanically sealed so no calibration result can be peeked at before evaluation.
 
 **10 packages. 17 MCP tools. 20 pipeline steps (11 PRD generation + 9 opt-in implementation). Multi-judge verification with consensus. Closed-loop calibration with externally-grounded falsifiers. 1503 tests. Every numeric constant traces to a citation, a benchmark, or a `// source: provisional heuristic` admission.**
 
@@ -103,7 +103,7 @@ map_failure_to_retrieval(violations[])
 ### Install (marketplace — recommended)
 
 ```bash
-claude plugin marketplace add cdeust/prd-spec-generator
+claude plugin marketplace add cdeust/ai-architect-mcp-spec
 claude plugin install prd-spec-generator
 ```
 
@@ -142,8 +142,8 @@ ecosystem. See [Companion ecosystem](#companion-ecosystem) above.
 For development or to run the audit cycle locally:
 
 ```bash
-git clone https://github.com/cdeust/prd-spec-generator.git
-cd prd-spec-generator
+git clone https://github.com/cdeust/ai-architect-mcp-spec.git
+cd ai-architect-mcp-spec
 pnpm install --frozen-lockfile
 pnpm build      # builds all 9 buildable packages via tsc
 pnpm bundle     # produces the standalone mcp-server/index.js
@@ -188,14 +188,14 @@ surface with exactly two deterministic tools and the same `audit-prd` and
 Install it in Codex from the repository marketplace:
 
 ```bash
-codex plugin marketplace add cdeust/prd-spec-generator
+codex plugin marketplace add cdeust/ai-architect-mcp-spec
 codex plugin add prd-spec-generator@prd-spec-generator-marketplace
 ```
 
 Install the same package as a Gemini CLI extension:
 
 ```bash
-gemini extensions install https://github.com/cdeust/prd-spec-generator
+gemini extensions install https://github.com/cdeust/ai-architect-mcp-spec
 ```
 
 Both manifests launch `mcp-server/index.js` with `--profile verifier`. The
@@ -210,8 +210,8 @@ For an un-packaged MCP host, clone the repository and select the same narrow
 profile explicitly. Replace `/abs/path` with the clone location.
 
 ```bash
-git clone https://github.com/cdeust/prd-spec-generator.git /abs/path/prd-spec-generator
-cd /abs/path/prd-spec-generator/mcp-server
+git clone https://github.com/cdeust/ai-architect-mcp-spec.git /abs/path/ai-architect-mcp-spec
+cd /abs/path/ai-architect-mcp-spec/mcp-server
 npm ci --omit=dev
 ```
 
@@ -219,7 +219,7 @@ npm ci --omit=dev
 desktop app and Codex IDE extension):
 
 ```bash
-codex mcp add prd-spec -- node /abs/path/prd-spec-generator/mcp-server/index.js --profile verifier
+codex mcp add prd-spec -- node /abs/path/ai-architect-mcp-spec/mcp-server/index.js --profile verifier
 ```
 
 **Cursor** (`.cursor/mcp.json`) and **Windsurf**
@@ -231,7 +231,7 @@ codex mcp add prd-spec -- node /abs/path/prd-spec-generator/mcp-server/index.js 
     "prd-spec": {
       "command": "node",
       "args": [
-        "/abs/path/prd-spec-generator/mcp-server/index.js",
+        "/abs/path/ai-architect-mcp-spec/mcp-server/index.js",
         "--profile",
         "verifier"
       ]
@@ -249,7 +249,7 @@ codex mcp add prd-spec -- node /abs/path/prd-spec-generator/mcp-server/index.js 
       "type": "stdio",
       "command": "node",
       "args": [
-        "/abs/path/prd-spec-generator/mcp-server/index.js",
+        "/abs/path/ai-architect-mcp-spec/mcp-server/index.js",
         "--profile",
         "verifier"
       ]
@@ -465,7 +465,7 @@ A cross-audit found and fixed two layer violations:
                                   └─────────────────────────────┘
 ```
 
-Each project owns one concern. `automatised-pipeline` knows what's true about the code. Cortex knows what we already decided. zetetic-team-subagents knows how to reason about a specific shape of claim. **prd-spec-generator** is the deterministic glue that turns those three signals into a PRD an agent can act on.
+Each project owns one concern. `automatised-pipeline` knows what's true about the code. Cortex knows what we already decided. zetetic-team-subagents knows how to reason about a specific shape of claim. **AI Architect MCP Spec** is the deterministic glue that turns those three signals into a PRD an agent can act on.
 
 ---
 

@@ -6,8 +6,8 @@
     "name": "Clement Deust",
     "email": "admin@ai-architect.tools"
   },
-  "homepage": "https://github.com/cdeust/prd-spec-generator",
-  "repository": "https://github.com/cdeust/prd-spec-generator",
+  "homepage": "https://github.com/cdeust/ai-architect-mcp-spec",
+  "repository": "https://github.com/cdeust/ai-architect-mcp-spec",
   "license": "MIT",
   "keywords": [
     "prd",

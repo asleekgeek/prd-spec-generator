@@ -4,7 +4,7 @@ This document states who decides what, how a decision is made, and what happens
 to the project if the current maintainer stops. It exists because a project that
 cannot answer those questions is a project you should not depend on.
 
-It is deliberately honest about scale: **prd-spec-generator has one
+It is deliberately honest about scale: **AI Architect MCP Spec has one
 maintainer.** Several practices below would read as bureaucratic theatre at this
 size, so they are described as what they actually are rather than dressed up.
 

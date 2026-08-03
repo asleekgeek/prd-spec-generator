@@ -13,6 +13,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **Canonical distribution identity.** The product and Claude/Codex/Gemini
   plugins remain `prd-spec-generator`, while the official MCP Registry entry
   and primary portable bundle become `ai-architect-mcp-spec` at version 0.7.0.
+  Repository-facing branding and URLs move to **AI Architect MCP Spec** at
+  `cdeust/ai-architect-mcp-spec`.
   Releases retain `prd-spec-generator.mcpb` as a byte-identical compatibility
   asset, and the existing `prd-gen` server/tool namespace remains unchanged.
   The release procedure deprecates all versions of the former Registry entry
