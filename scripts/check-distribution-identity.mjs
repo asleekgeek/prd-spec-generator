@@ -36,7 +36,14 @@ assert.equal(
   server.packages[0].identifier,
   `https://github.com/cdeust/${product}/releases/download/v${version}/${distribution}.mcpb`,
 );
-assert.match(server.packages[0].fileSha256, /^[a-f0-9]{64}$/);
+if (server.packages[0].fileSha256 !== undefined) {
+  assert.match(server.packages[0].fileSha256, /^[a-f0-9]{64}$/);
+  assert.notEqual(
+    server.packages[0].fileSha256,
+    "0".repeat(64),
+    "fileSha256 must be omitted before release or contain the real artifact digest",
+  );
+}
 
 assert.match(text("README.md"), new RegExp(`<!-- mcp-name: ${registryId} -->`));
 assert.match(text("CHANGELOG.md"), new RegExp(`^## \\[${version.replaceAll(".", "\\.")}\\]`, "m"));

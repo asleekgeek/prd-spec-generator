@@ -57,6 +57,9 @@ describe("mcpb checksum verification (#23 class)", () => {
   it("REJECTS an unpatched placeholder (never a published placeholder)", () => {
     expect(() => extractRecordedChecksum(serverJson("PLACEHOLDER"))).toThrow();
     expect(() => extractRecordedChecksum(serverJson(""))).toThrow();
+    expect(() => extractRecordedChecksum(serverJson("0".repeat(64)))).toThrow(
+      /all-zero pre-release placeholder/,
+    );
   });
 
   it("REJECTS a missing fileSha256 field", () => {

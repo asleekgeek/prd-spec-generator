@@ -150,10 +150,9 @@ jobs:
         run: |
           set -euo pipefail
           # INVARIANT (see scripts/publish-mcp-registry.sh header): the
-          # fileSha256 committed to server.json at release-PR time is a
-          # placeholder — JSON has no comment syntax to note this in the
-          # file itself — because the real checksum only exists after this
-          # job builds the .mcpb above. Patch it here and commit the
+          # fileSha256 is intentionally absent before release because the real
+          # checksum only exists after this job builds the .mcpb above. Add it
+          # here and commit the
           # single-file change back to main in the next step; this closes
           # the loop for the current tag automatically (#23) and leaves
           # publish-mcp-registry.sh as a manual fallback for any tag whose

@@ -15,6 +15,8 @@ adheres to [Semantic Versioning](https://semver.org/).
   and primary portable bundle become `ai-architect-mcp-spec` at version 0.7.0.
   Releases retain `prd-spec-generator.mcpb` as a byte-identical compatibility
   asset, and the existing `prd-gen` server/tool namespace remains unchanged.
+  The release procedure deprecates all versions of the former Registry entry
+  only after the new canonical entry is active.
 
 - **Portable Spec Verifier for Codex and Gemini CLI.** Both host manifests now
   launch the same opt-in `verifier` profile, which advertises and accepts only
@@ -27,6 +29,12 @@ adheres to [Semantic Versioning](https://semver.org/).
   invariant.
 
 ### Fixed
+
+- **Registry checksum guard now validates the field consumers actually read.**
+  Release automation and verification use the schema-defined `fileSha256`
+  property rather than agreeing circularly on an unused `file_sha256` field.
+  The checksum is omitted until the artifact exists, and both identity and
+  digest guards explicitly reject the former all-zero placeholder.
 
 - **Codex and Gemini verifier startup from immutable plugin installs.** Their
   host manifests now execute the bundled server directly instead of running a

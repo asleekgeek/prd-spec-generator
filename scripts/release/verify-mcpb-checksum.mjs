@@ -57,6 +57,12 @@ export function extractRecordedChecksum(serverJson) {
     throw new Error("server.json packages[0].fileSha256 is missing or not a string");
   }
   const normalized = sha.trim().toLowerCase();
+  if (normalized === "0".repeat(64)) {
+    throw new Error(
+      "server.json packages[0].fileSha256 is the all-zero pre-release placeholder; " +
+        "a placeholder must never be published",
+    );
+  }
   if (!/^[0-9a-f]{64}$/.test(normalized)) {
     throw new Error(
       `server.json packages[0].fileSha256 is not a SHA-256 digest ` +

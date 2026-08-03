@@ -56,11 +56,17 @@
 # Step 6  — Submit to MCP Registry (uses server.json):
 #             mcp-publisher publish
 #
-# Step 7  — Submit to Glama (uses glama.json; may be automatic on registry merge):
+# Step 7  — Deprecate every version of the former registry identity, but only
+#             AFTER the new identity above is active:
+#             mcp-publisher status --status deprecated --all-versions \
+#               --message "Moved to io.github.cdeust/ai-architect-mcp-spec" \
+#               io.github.cdeust/prd-spec-generator
+#
+# Step 8  — Submit to Glama (uses glama.json; may be automatic on registry merge):
 #             # Glama crawls repos that have glama.json — typically no manual step needed.
 #             # If Glama provides a CLI: mcp-publisher publish --registry glama
 #
-# Step 8  — Submit to Anthropic MCP Directory / Claude Desktop bundle:
+# Step 9  — Submit to Anthropic MCP Directory / Claude Desktop bundle:
 #             # The Anthropic directory indexes servers listed in the MCP Registry.
 #             # No separate submission is required once Step 6 is approved.
 #
@@ -116,5 +122,7 @@ echo ""
 echo "  # Authenticate and publish to MCP Registry:"
 echo "  mcp-publisher login github"
 echo "  mcp-publisher publish"
+echo "  # After the new identity is active, deprecate the former registry entries:"
+echo "  mcp-publisher status --status deprecated --all-versions --message \"Moved to io.github.cdeust/ai-architect-mcp-spec\" io.github.cdeust/prd-spec-generator"
 echo ""
 echo "══════════════════════════════════════════════════════════"

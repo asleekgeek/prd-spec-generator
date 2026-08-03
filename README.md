@@ -7,6 +7,9 @@
 The product and host plugins remain **prd-spec-generator**. Its canonical MCP
 Registry and portable bundle identity is **ai-architect-mcp-spec**; the legacy
 `prd-spec-generator.mcpb` release asset remains available for compatibility.
+After 0.7.0 is published under the new identity, the former
+`io.github.cdeust/prd-spec-generator` Registry versions are deprecated with a
+pointer to the canonical entry rather than left active and frozen.
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License">

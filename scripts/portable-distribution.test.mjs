@@ -74,5 +74,5 @@ test("canonical distribution identity is separate from host plugin identity", ()
   assert.equal(server.version, pkg.version);
   assert.equal(server.packages[0].version, pkg.version);
   assert.match(server.packages[0].identifier, /\/ai-architect-mcp-spec\.mcpb$/);
-  assert.match(server.packages[0].fileSha256, /^[a-f0-9]{64}$/);
+  assert.equal(server.packages[0].fileSha256, undefined);
 });
