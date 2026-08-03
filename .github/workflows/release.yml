@@ -152,8 +152,8 @@ jobs:
           # INVARIANT (see scripts/publish-mcp-registry.sh header): the
           # fileSha256 is intentionally absent before release because the real
           # checksum only exists after this job builds the .mcpb above. Add it
-          # here and commit the
-          # single-file change back to main in the next step; this closes
+          # here and commit the single-file change back to main in the next
+          # step; this closes
           # the loop for the current tag automatically (#23) and leaves
           # publish-mcp-registry.sh as a manual fallback for any tag whose
           # release job didn't run this step (e.g. pre-#23 releases).

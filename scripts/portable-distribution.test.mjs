@@ -11,6 +11,12 @@ const text = (path) => readFileSync(join(ROOT, path), "utf8");
 const EXPECTED_ARGS = ["--profile", "verifier"];
 const SKILLS = ["audit-prd", "validate-spec"];
 
+const assertOptionalReleasedChecksum = (checksum) => {
+  if (checksum === undefined) return;
+  assert.match(checksum, /^[a-f0-9]{64}$/);
+  assert.notEqual(checksum, "0".repeat(64));
+};
+
 test("Codex and Gemini launch the same verifier profile", () => {
   const pkg = json("package.json");
   const codex = json(".codex-plugin/plugin.json");
@@ -74,5 +80,11 @@ test("canonical distribution identity is separate from host plugin identity", ()
   assert.equal(server.version, pkg.version);
   assert.equal(server.packages[0].version, pkg.version);
   assert.match(server.packages[0].identifier, /\/ai-architect-mcp-spec\.mcpb$/);
-  assert.equal(server.packages[0].fileSha256, undefined);
+  assertOptionalReleasedChecksum(server.packages[0].fileSha256);
+});
+
+test("portable identity accepts pre-release and real post-release checksums", () => {
+  assert.doesNotThrow(() => assertOptionalReleasedChecksum(undefined));
+  assert.doesNotThrow(() => assertOptionalReleasedChecksum("a".repeat(64)));
+  assert.throws(() => assertOptionalReleasedChecksum("0".repeat(64)));
 });
