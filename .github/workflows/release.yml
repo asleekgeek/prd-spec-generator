@@ -27,7 +27,8 @@ jobs:
     name: Build, test, and publish release
     runs-on: ubuntu-latest
     permissions:
-      contents: write       # create the release, upload assets, push server.json
+      contents: write       # create the release, upload assets, push checksum branch
+      pull-requests: write  # open the protected-main checksum update PR
       id-token: write       # OIDC token Sigstore exchanges for a signing cert
       attestations: write   # record the build-provenance statement on the repo
 
@@ -152,9 +153,9 @@ jobs:
           # INVARIANT (see scripts/publish-mcp-registry.sh header): the
           # fileSha256 is intentionally absent before release because the real
           # checksum only exists after this job builds the .mcpb above. Add it
-          # here and commit the single-file change back to main in the next
-          # step; this closes
-          # the loop for the current tag automatically (#23) and leaves
+          # here and commit the single-file change on a dedicated branch in the
+          # next step; this closes the loop for the current tag automatically
+          # without bypassing protected main (#23), and leaves
           # publish-mcp-registry.sh as a manual fallback for any tag whose
           # release job didn't run this step (e.g. pre-#23 releases).
           jq --arg sha "${MCPB_SHA256}" '.packages[0].fileSha256 = $sha' server.json > server.json.tmp
@@ -172,22 +173,31 @@ jobs:
           node scripts/release/verify-mcpb-checksum.mjs \
             ai-architect-mcp-spec.mcpb server.json
 
-      - name: Commit and push patched server.json to main
+      - name: Open protected-main PR for patched server.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           if git diff --quiet -- server.json; then
             echo "server.json already carries the correct checksum; nothing to commit."
             exit 0
           fi
+          CHECKSUM_BRANCH="release/${GITHUB_REF_NAME}-server-json"
+          if git ls-remote --exit-code --heads origin "${CHECKSUM_BRANCH}" >/dev/null 2>&1; then
+            echo "::error::Checksum branch ${CHECKSUM_BRANCH} already exists; inspect its PR before rerunning."
+            exit 1
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git switch -c "${CHECKSUM_BRANCH}"
           git add server.json
           git commit -m "chore(release): patch server.json sha256 for ${GITHUB_REF_NAME}"
-          # HEAD is the tag commit (detached); fast-forward main to it.
-          # If main has diverged since the tag was cut, this push is
-          # rejected (non-fast-forward) rather than silently overwriting
-          # history — fall back to scripts/publish-mcp-registry.sh in that case.
-          git push origin HEAD:refs/heads/main
+          git push origin "HEAD:refs/heads/${CHECKSUM_BRANCH}"
+          gh pr create \
+            --base main \
+            --head "${CHECKSUM_BRANCH}" \
+            --title "chore(release): patch server.json sha256 for ${GITHUB_REF_NAME}" \
+            --body "Automated checksum update for the verified canonical MCPB built by release run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. Merge this PR before publishing ${GITHUB_REF_NAME} to the MCP Registry. SHA-256: \`${MCPB_SHA256}\`."
 
       - name: Extract release notes from CHANGELOG
         id: changelog
