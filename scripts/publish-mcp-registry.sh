@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
 # publish-mcp-registry.sh — Publish runbook for AI Architect MCP Spec.
 #
-# NOTE (#23, since release.yml's "Commit and push patched server.json to
-# main" step): the release workflow now patches server.json's
-# packages[0].fileSha256 with the real .mcpb checksum automatically on
-# every tag push and commits it to main. Steps 1-4 below are a MANUAL
-# FALLBACK — use them only if a release's CI run skipped or failed that
-# step (e.g. because the auto-push was rejected as non-fast-forward, or
-# for a tag cut before #23 landed). Steps 5-8 (mcp-publisher submission)
-# are still manual regardless.
+# NOTE (#23): the release workflow patches server.json's
+# packages[0].fileSha256 with the real .mcpb checksum on every tag push,
+# pushes a dedicated release branch, and opens a PR because main is protected.
+# Steps 3-4 below are a MANUAL FALLBACK when that automated PR is absent.
+# Registry submission remains manual regardless.
 #
 # USAGE:
 #   ./scripts/publish-mcp-registry.sh <tag>
@@ -39,16 +36,18 @@
 #             git tag v0.4.0
 #             git push origin v0.4.0
 #
-# Step 2  — Wait for the CI release job to complete. Confirm the .mcpb and
-#             .sha256 artifacts appear on the GitHub release page.
+# Step 2  — Wait for CI to create the GitHub release and checksum PR. Confirm
+#             the .mcpb and .sha256 assets, then merge the green checksum PR.
 #
 # Step 3  — Run this script to patch server.json with the real SHA-256:
 #             ./scripts/publish-mcp-registry.sh v0.4.0
 #
-# Step 4  — Commit the updated server.json:
+# Step 4  — Commit the updated server.json through a PR (main is protected):
+#             git switch -c release/v0.4.0-server-json
 #             git add server.json
 #             git commit -m "chore: update server.json sha256 for v0.4.0"
-#             git push origin main
+#             git push -u origin release/v0.4.0-server-json
+#             gh pr create --base main --fill
 #
 # Step 5  — Authenticate with mcp-publisher (GitHub OAuth):
 #             mcp-publisher login github
@@ -114,10 +113,12 @@ echo "════════════════════════�
 echo "  NEXT STEPS (run these commands manually after reviewing)"
 echo "══════════════════════════════════════════════════════════"
 echo ""
-echo "  # Commit the updated server.json:"
+echo "  # Commit the updated server.json through protected-main review:"
+echo "  git switch -c release/${TAG}-server-json"
 echo "  git add server.json"
 echo "  git commit -m 'chore: update server.json sha256 for ${TAG}'"
-echo "  git push origin main"
+echo "  git push -u origin release/${TAG}-server-json"
+echo "  gh pr create --base main --fill"
 echo ""
 echo "  # Authenticate and publish to MCP Registry:"
 echo "  mcp-publisher login github"
