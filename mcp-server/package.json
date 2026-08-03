@@ -1,6 +1,6 @@
 {
   "name": "@prd-gen/mcp-server-bundle",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Self-contained ESM bundle of the prd-spec-generator MCP server. Built by `pnpm bundle` from the workspace TypeScript source. `bin/ensure-deps.sh` provisions the externalised runtime deps below on first launch, then runs index.js via `node`.",
   "type": "module",
   "main": "./index.js",

@@ -9,7 +9,7 @@ name: Release
 #   * attests build provenance for the .mcpb and the SBOM (Sigstore; verify
 #     with `gh attestation verify <file> --repo cdeust/prd-spec-generator`);
 #   * generates a CycloneDX SBOM from pnpm-lock.yaml covering the workspace;
-#   * VERIFIES server.json's file_sha256 equals the built .mcpb before it is
+#   * VERIFIES server.json's fileSha256 equals the built .mcpb before it is
 #     committed/published — closing the #23 defect class in the pipeline, not
 #     just its instance (scripts/release/verify-mcpb-checksum.mjs);
 #   * pins every third-party action to a commit SHA.
@@ -50,6 +50,9 @@ jobs:
 
       - name: Install dependencies (frozen)
         run: pnpm install --frozen-lockfile
+
+      - name: Verify product and distribution identities
+        run: pnpm check:identity
 
       - name: Build all packages
         run: pnpm build
@@ -101,7 +104,8 @@ jobs:
       - name: Pack .mcpb bundle
         run: |
           set -euo pipefail
-          OUTFILE="${GITHUB_WORKSPACE}/prd-spec-generator.mcpb"
+          OUTFILE="${GITHUB_WORKSPACE}/ai-architect-mcp-spec.mcpb"
+          LEGACY_OUTFILE="${GITHUB_WORKSPACE}/prd-spec-generator.mcpb"
 
           # Use @anthropic-ai/mcpb if available, else zip
           if npx -y --yes @anthropic-ai/mcpb@latest pack --help >/dev/null 2>&1; then
@@ -110,8 +114,12 @@ jobs:
             (cd "${STAGE_DIR}" && zip -r "${OUTFILE}" .)
           fi
 
+          # Compatibility window: both names are the exact same artifact.
+          cp "${OUTFILE}" "${LEGACY_OUTFILE}"
+
           # Compute SHA-256 checksum
           shasum -a 256 "${OUTFILE}" | awk '{print $1}' > "${OUTFILE}.sha256"
+          shasum -a 256 "${LEGACY_OUTFILE}" | awk '{print $1}' > "${LEGACY_OUTFILE}.sha256"
           echo "SHA256: $(cat "${OUTFILE}.sha256")"
           echo "MCPB_SHA256=$(cat "${OUTFILE}.sha256")" >> "$GITHUB_ENV"
 
@@ -134,6 +142,7 @@ jobs:
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-path: |
+            ai-architect-mcp-spec.mcpb
             prd-spec-generator.mcpb
             prd-spec-generator.cdx.json
 
@@ -141,7 +150,7 @@ jobs:
         run: |
           set -euo pipefail
           # INVARIANT (see scripts/publish-mcp-registry.sh header): the
-          # file_sha256 committed to server.json at release-PR time is a
+          # fileSha256 committed to server.json at release-PR time is a
           # placeholder — JSON has no comment syntax to note this in the
           # file itself — because the real checksum only exists after this
           # job builds the .mcpb above. Patch it here and commit the
@@ -149,10 +158,10 @@ jobs:
           # the loop for the current tag automatically (#23) and leaves
           # publish-mcp-registry.sh as a manual fallback for any tag whose
           # release job didn't run this step (e.g. pre-#23 releases).
-          jq --arg sha "${MCPB_SHA256}" '.packages[0].file_sha256 = $sha' server.json > server.json.tmp
+          jq --arg sha "${MCPB_SHA256}" '.packages[0].fileSha256 = $sha' server.json > server.json.tmp
           mv server.json.tmp server.json
           jq empty server.json
-          echo "Patched file_sha256: $(jq -r '.packages[0].file_sha256' server.json)"
+          echo "Patched fileSha256: $(jq -r '.packages[0].fileSha256' server.json)"
 
       # Close the #23 defect class in the pipeline (issue #29 criterion 4): the
       # value we are about to publish MUST equal the artifact we built. This
@@ -162,7 +171,7 @@ jobs:
       - name: Verify server.json checksum matches the built .mcpb
         run: |
           node scripts/release/verify-mcpb-checksum.mjs \
-            prd-spec-generator.mcpb server.json
+            ai-architect-mcp-spec.mcpb server.json
 
       - name: Commit and push patched server.json to main
         run: |
@@ -198,7 +207,8 @@ jobs:
           fi
           # Append SHA256 to release notes for auditability
           echo "" >> release-notes.md
-          echo "### .mcpb bundle" >> release-notes.md
+          echo "### Canonical .mcpb bundle" >> release-notes.md
+          echo "Artifact: \`ai-architect-mcp-spec.mcpb\` (legacy alias: \`prd-spec-generator.mcpb\`)" >> release-notes.md
           echo "SHA-256: \`${MCPB_SHA256}\`" >> release-notes.md
 
       - name: Create GitHub Release (with .mcpb artifact + SBOM)
@@ -208,6 +218,8 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
+            ai-architect-mcp-spec.mcpb
+            ai-architect-mcp-spec.mcpb.sha256
             prd-spec-generator.mcpb
             prd-spec-generator.mcpb.sha256
             prd-spec-generator.cdx.json

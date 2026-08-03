@@ -3,7 +3,7 @@
 #
 # NOTE (#23, since release.yml's "Commit and push patched server.json to
 # main" step): the release workflow now patches server.json's
-# packages[0].file_sha256 with the real .mcpb checksum automatically on
+# packages[0].fileSha256 with the real .mcpb checksum automatically on
 # every tag push and commits it to main. Steps 1-4 below are a MANUAL
 # FALLBACK — use them only if a release's CI run skipped or failed that
 # step (e.g. because the auto-push was rejected as non-fast-forward, or
@@ -15,8 +15,8 @@
 #   ./scripts/publish-mcp-registry.sh v0.4.0
 #
 # WHAT THIS SCRIPT DOES:
-#   1. Downloads the released prd-spec-generator.mcpb from GitHub Releases.
-#   2. Computes its SHA-256 and writes it into server.json .packages[0].file_sha256.
+#   1. Downloads the released ai-architect-mcp-spec.mcpb from GitHub Releases.
+#   2. Computes its SHA-256 and writes it into server.json .packages[0].fileSha256.
 #   3. Prints the mcp-publisher commands you must run manually to submit to all three
 #      registries (MCP Registry, Glama, Anthropic MCP Directory).
 #
@@ -75,7 +75,7 @@ if [ -z "${TAG}" ]; then
 fi
 
 REPO="cdeust/prd-spec-generator"
-BUNDLE_NAME="prd-spec-generator.mcpb"
+BUNDLE_NAME="ai-architect-mcp-spec.mcpb"
 RELEASE_URL="https://github.com/${REPO}/releases/download/${TAG}/${BUNDLE_NAME}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -99,7 +99,7 @@ rm -f "${TMP_FILE}"
 echo "==> SHA-256: ${SHA256}"
 
 echo "==> Patching server.json ..."
-PATCHED="$(jq --arg sha "${SHA256}" '.packages[0].file_sha256 = $sha' "${SERVER_JSON}")"
+PATCHED="$(jq --arg sha "${SHA256}" '.packages[0].fileSha256 = $sha' "${SERVER_JSON}")"
 echo "${PATCHED}" > "${SERVER_JSON}"
 echo "    server.json updated."
 

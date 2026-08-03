@@ -1,19 +1,19 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.cdeust/prd-spec-generator",
-  "description": "Cross-platform PRD verification and host-driven generation — deterministic rules, multi-judge consensus, 17 MCP tools.",
+  "name": "io.github.cdeust/ai-architect-mcp-spec",
+  "description": "PRD verification and host-driven generation with multi-judge consensus across 17 MCP tools.",
   "repository": {
     "url": "https://github.com/cdeust/prd-spec-generator",
     "source": "github"
   },
-  "version": "0.6.1",
+  "version": "0.7.0",
   "websiteUrl": "https://ai-architect.tools",
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/cdeust/prd-spec-generator/releases/download/v0.6.1/prd-spec-generator.mcpb",
-      "version": "0.6.1",
-      "fileSha256": "d6f0ce83456f65ffd7663966362612fa2224c7670dbc419d72db7cfccfc10815",
+      "identifier": "https://github.com/cdeust/prd-spec-generator/releases/download/v0.7.0/ai-architect-mcp-spec.mcpb",
+      "version": "0.7.0",
+      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "transport": {
         "type": "stdio"
       }

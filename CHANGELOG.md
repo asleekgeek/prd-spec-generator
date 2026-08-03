@@ -6,7 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-08-03 — portable verifier and canonical distribution identity
+
 ### Added
+
+- **Canonical distribution identity.** The product and Claude/Codex/Gemini
+  plugins remain `prd-spec-generator`, while the official MCP Registry entry
+  and primary portable bundle become `ai-architect-mcp-spec` at version 0.7.0.
+  Releases retain `prd-spec-generator.mcpb` as a byte-identical compatibility
+  asset, and the existing `prd-gen` server/tool namespace remains unchanged.
 
 - **Portable Spec Verifier for Codex and Gemini CLI.** Both host manifests now
   launch the same opt-in `verifier` profile, which advertises and accepts only

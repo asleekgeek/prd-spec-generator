@@ -24,7 +24,7 @@ ecosystem:
   - genius reasoning patterns — liskov, dijkstra, fermi, popper, ...
 ---
 
-# AI PRD Generator (v0.6.1) — Dispatcher Protocol
+# AI PRD Generator (v0.7.0) — Dispatcher Protocol
 
 You (the host) drive a loop:
 
