@@ -28,7 +28,8 @@ adheres to [Semantic Versioning](https://semver.org/).
   read-only before exercising MCP initialize, tool discovery, and validation.
   Claude Code remains the primary full-profile interface: its `.mcp.json`
   launch path and 17-tool surface are unchanged and covered by regression
-  tests.
+  tests. The obsolete verifier-only dependency branch was removed from the
+  remaining Claude launcher after the portable hosts stopped invoking it.
 
 - **The server advertised the wrong version to every host that connected.**
   `serverInfo.version` was the literal `0.4.0` in `packages/mcp-server/src/index.ts`

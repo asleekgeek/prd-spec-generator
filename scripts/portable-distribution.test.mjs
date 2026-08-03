@@ -53,7 +53,9 @@ test("portable skill manifests contain only supported frontmatter", () => {
 test("Claude remains on its existing full-profile launch path", () => {
   const claude = json(".mcp.json");
   const server = claude.mcpServers["prd-gen"];
+  const launcher = text("bin/ensure-deps.sh");
   assert.equal(server.args.includes("--profile"), false);
   assert.match(server.args[0], /\$\{CLAUDE_PLUGIN_ROOT\}/);
-  assert.match(text("bin/ensure-deps.sh"), /exec node .*"\$@"/);
+  assert.match(launcher, /exec node .*"\$@"/);
+  assert.doesNotMatch(launcher, /PROFILE|--profile|omit=optional/);
 });
