@@ -79,10 +79,7 @@ function loadSkillConfig(): Record<string, unknown> {
 }
 
 function loadSkillMd(): string {
-  const skillPaths = [
-    join(PLUGIN_ROOT, "skills", "prd-spec-generator", "SKILL.md"),
-    join(PLUGIN_ROOT, "packages", "skill", "SKILL.md"),
-  ];
+  const skillPaths = [join(PLUGIN_ROOT, "packages", "skill", "SKILL.md")];
 
   for (const p of skillPaths) {
     if (existsSync(p)) {

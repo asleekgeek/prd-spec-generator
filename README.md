@@ -4,9 +4,8 @@
   <img src="assets/banner.svg" alt="AI Architect MCP Spec — verified PRDs for agentic delivery pipelines" width="100%"/>
 </p>
 
-**AI Architect MCP Spec** is distributed as `ai-architect-mcp-spec`. The
-Claude Code plugin remains `prd-spec-generator` for compatibility, as does the
-legacy `prd-spec-generator.mcpb` release asset.
+**AI Architect MCP Spec** is published as `ai-architect-mcp-spec` across its
+Claude Code, Codex, Gemini, MCPB, PyPI/npm, and MCP Registry surfaces.
 After 0.7.0 is published under the new identity, the former
 `io.github.cdeust/prd-spec-generator` Registry versions are deprecated with a
 pointer to the canonical entry rather than left active and frozen.
@@ -15,7 +14,7 @@ pointer to the canonical entry rather than left active and frozen.
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License">
   <img src="https://img.shields.io/badge/TypeScript-7.0+-3178c6.svg" alt="TypeScript 7.0+">
   <img src="https://img.shields.io/badge/Node-20.x_·_22.x-339933.svg" alt="Node 20/22">
-  <img src="https://img.shields.io/badge/Tests-1503_passing-brightgreen" alt="1503 passing">
+  <img src="https://img.shields.io/badge/Tests-1504_passing-brightgreen" alt="1504 passing">
   <img src="https://img.shields.io/badge/Packages-10-orange" alt="10 packages">
   <img src="https://img.shields.io/badge/MCP_Tools-17-8A2BE2" alt="17 MCP tools">
   <img src="https://img.shields.io/badge/Validators-Hard_Output_Rules-red" alt="Hard Output Rules">
@@ -45,7 +44,7 @@ Every AI agent that drafts a PRD eventually invents a function that doesn't exis
 
 **AI Architect MCP Spec** is a TypeScript MCP server that fixes this at the structural level. Its portable verifier gives Codex, Gemini CLI, Claude Code, CI, and other stdio MCP hosts the same deterministic Hard Output Rules and cross-section traceability checks. The full pipeline is a stateless reducer (`step(state, result?) → next_state, action`) driven by a host that can execute its orchestration actions; Claude Code is the only packaged full-pipeline host today. Sections are produced one at a time, validated before the host ever sees them, and every load-bearing claim is judged by a panel of genius reasoning agents drawn from `zetetic-team-subagents` against the codebase graph from `automatised-pipeline`. The loop is closed: per-judge reliability is calibrated from history, retry budgets are derived from survival statistics, KPI gates are tuned against frozen baselines, and held-out partitions are mechanically sealed so no calibration result can be peeked at before evaluation.
 
-**10 packages. 17 MCP tools. 20 pipeline steps (11 PRD generation + 9 opt-in implementation). Multi-judge verification with consensus. Closed-loop calibration with externally-grounded falsifiers. 1503 tests. Every numeric constant traces to a citation, a benchmark, or a `// source: provisional heuristic` admission.**
+**10 packages. 17 MCP tools. 20 pipeline steps (11 PRD generation + 9 opt-in implementation). Multi-judge verification with consensus. Closed-loop calibration with externally-grounded falsifiers. 1504 tests. Every numeric constant traces to a citation, a benchmark, or a `// source: provisional heuristic` admission.**
 
 ---
 
@@ -104,7 +103,7 @@ map_failure_to_retrieval(violations[])
 
 ```bash
 claude plugin marketplace add cdeust/ai-architect-mcp-spec
-claude plugin install prd-spec-generator
+claude plugin install ai-architect-mcp-spec@ai-architect-mcp-spec-marketplace
 ```
 
 Restart your Claude Code session. The 17 MCP tools register on first
@@ -117,6 +116,39 @@ stdio handshake. Then:
 The plugin's bundled MCP server at `mcp-server/index.js` is self-contained
 (only `better-sqlite3` is an optional native dependency for the evidence
 repository — gracefully degrades to in-memory mode when absent).
+
+#### Migrating from `prd-spec-generator`
+
+The old plugin and marketplace are deprecated publications, not aliases. Remove
+them before installing the canonical package:
+
+```bash
+claude plugin uninstall prd-spec-generator@prd-spec-generator-marketplace
+claude plugin marketplace remove prd-spec-generator-marketplace
+claude plugin marketplace add cdeust/ai-architect-mcp-spec
+claude plugin install ai-architect-mcp-spec@ai-architect-mcp-spec-marketplace
+```
+
+Callers that used `prd-spec-generator:generate-prd` must use
+`ai-architect-mcp-spec:generate-prd`. The `prd-gen` MCP server name,
+`@prd-gen/*` private workspace packages, `PRD_GEN_*` environment variables,
+and `.prd-gen` local data directory remain stable internal interfaces; they do
+not keep the deprecated publication installed.
+
+Plugin-scoped MCP tool names include both the publication name and the stable
+server key, so prompts, automation, and allowlists must migrate the complete
+prefix:
+
+- old: `mcp__plugin_prd-spec-generator_prd-gen__<tool>` <!-- mcp-prefix-allow-legacy -->
+- new: `mcp__plugin_ai-architect-mcp-spec_prd-gen__<tool>`
+
+Gemini CLI also keys installed extensions by the manifest name. Replace an
+installed extension under the former identity instead of updating it in place:
+
+```bash
+gemini extensions uninstall prd-spec-generator
+gemini extensions install https://github.com/cdeust/ai-architect-mcp-spec
+```
 
 ### Companion ecosystem
 
@@ -147,7 +179,7 @@ cd ai-architect-mcp-spec
 pnpm install --frozen-lockfile
 pnpm build      # builds all 9 buildable packages via tsc
 pnpm bundle     # produces the standalone mcp-server/index.js
-pnpm test       # 1503 tests (vitest workspace, all packages; live MCP
+pnpm test       # 1504 tests (vitest workspace, all packages; live MCP
                 # integration env-gated by AIPRD_PIPELINE_BIN)
 ```
 
@@ -189,7 +221,7 @@ Install it in Codex from the repository marketplace:
 
 ```bash
 codex plugin marketplace add cdeust/ai-architect-mcp-spec
-codex plugin add prd-spec-generator@prd-spec-generator-marketplace
+codex plugin add ai-architect-mcp-spec@ai-architect-mcp-spec-marketplace
 ```
 
 Install the same package as a Gemini CLI extension:

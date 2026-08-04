@@ -7,14 +7,24 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const json = (path) => JSON.parse(readFileSync(join(root, path), "utf8"));
 const text = (path) => readFileSync(join(root, path), "utf8");
 
-const product = "prd-spec-generator";
 const distribution = "ai-architect-mcp-spec";
+const product = distribution;
 const repository = distribution;
 const registryId = `io.github.cdeust/${distribution}`;
 const pkg = json("package.json");
 const version = pkg.version;
+const fullSkill = text("packages/skill/SKILL.md");
+const fullSkillPackage = json("packages/skill/package.json");
+const claudePlugin = json(".claude-plugin/plugin.json");
+const claudeMcpConfig = json(claudePlugin.mcpServers);
+const claudeServerKeys = Object.keys(claudeMcpConfig.mcpServers);
 
 assert.equal(pkg.name, distribution);
+assert.deepEqual(claudeServerKeys, ["prd-gen"]);
+assert.equal(
+  `mcp__plugin_${claudePlugin.name}_${claudeServerKeys[0]}__`,
+  "mcp__plugin_ai-architect-mcp-spec_prd-gen__",
+);
 for (const path of [
   "manifest.json",
   ".claude-plugin/plugin.json",
@@ -48,10 +58,13 @@ if (server.packages[0].fileSha256 !== undefined) {
 }
 
 assert.match(text("README.md"), new RegExp(`<!-- mcp-name: ${registryId} -->`));
+assert.match(fullSkill, new RegExp(`^---\\nname: ${distribution}\\nversion: ${version.replaceAll(".", "\\.")}\\n`));
+assert.equal(fullSkillPackage.name, "@ai-architect-mcp-spec/skill");
+assert.doesNotMatch(text("packages/mcp-server/src/index.ts"), /skills\", \"prd-spec-generator/);
 assert.match(text("CHANGELOG.md"), new RegExp(`^## \\[${version.replaceAll(".", "\\.")}\\]`, "m"));
 const release = text(".github/workflows/release.yml");
 assert.match(release, new RegExp(`${distribution}\\.mcpb`));
-assert.match(release, new RegExp(`${product}\\.mcpb`));
+assert.doesNotMatch(release, /prd-spec-generator\.mcpb/);
 assert.match(release, new RegExp(`${distribution}\\.cdx\\.json`));
 
 console.log(`Distribution identity is consistent at ${distribution} v${version}.`);
